@@ -2,7 +2,6 @@ import tensorflow as tf
 import tensorflow.contrib.layers as layers
 
 from dqn_model import DqnModel
-from model_inputs import ModelInputs
 from modeling_utils import get_activation
 from potential_point import PotentialPoint
 
@@ -20,14 +19,13 @@ class Network(object):
         self.pose_dimensions = pose_dimensions
 
         # generate inputs
-        self.model_inputs = ModelInputs.from_config(config)
         all_inputs = self._create_inputs()
         self.joints_inputs = all_inputs[0]
         self.workspace_image_inputs = all_inputs[1]
-        self.pose_inputs = all_inputs[2]
-        self.jacobian_inputs = all_inputs[3]
-        self.goal_pose_inputs = all_inputs[4]
-        self.goal_joints_inputs = all_inputs[5]
+        self.goal_joints_inputs = all_inputs[2]
+        self.goal_pose_inputs = all_inputs[3]
+
+        self.network_features = self._generate_features()
 
         # since we take partial derivatives w.r.t subsets of the parameters, we always need to remember which parameters
         # are currently being added. note that this also causes the model to be non thread safe, therefore the creation
@@ -37,9 +35,8 @@ class Network(object):
         # online actor network
         actor_results = self._create_actor_network(True, True)
         self.online_action = actor_results[0]
-        online_pose_force = actor_results[1]
-        actor_extra_losses = actor_results[2]
-        actor_summaries = actor_results[3]
+        actor_extra_losses = actor_results[1]
+        actor_summaries = actor_results[2]
         self.online_actor_params = tf.trainable_variables()[variable_count:]
 
         # create placeholders and assign ops to set these weights manually (used by rollout agents)
@@ -59,9 +56,8 @@ class Network(object):
         variable_count = len(tf.trainable_variables())
         actor_results = self._create_actor_network(False, False)
         self.target_action = actor_results[0]
-        target_pose_force = actor_results[1]
+        assert actor_results[1] is None
         assert actor_results[2] is None
-        assert actor_results[3] is None
         target_actor_params = tf.trainable_variables()[variable_count:]
 
         # periodically update target actor with online actor weights
@@ -121,7 +117,7 @@ class Network(object):
         if actor_extra_losses is not None:
             actor_loss += actor_extra_losses
         # divide by the batch size
-        batch_size = tf.shape(self.goal_pose_inputs)[0]
+        batch_size = tf.shape(self.goal_joints_inputs)[0]
         actor_loss = tf.div(actor_loss, tf.cast(batch_size, tf.float32))
 
         actor_initial_gradients_norm, actor_clipped_gradients_norm, self.optimize_actor = self._optimize_by_loss(
@@ -150,67 +146,61 @@ class Network(object):
         return initial_gradients_norm, clipped_gradients_norm, optimize_op
 
     def _create_inputs(self):
-        joints_inputs = None
-        if self.model_inputs.consider_current_joints:
-            joints_inputs = tf.placeholder(tf.float32, (None, self.number_of_joints), name='joints_inputs')
+        joints_inputs = tf.placeholder(tf.float32, (None, self.number_of_joints), name='joints_inputs')
+        goal_joints_inputs = tf.placeholder(tf.float32, (None, self.number_of_joints), name='goal_joints_inputs')
 
         # sometimes we don't want to get an image (single workspace)
         workspace_image_inputs = None
-        if self.model_inputs.consider_image:
+        if self.config['model']['consider_image']:
             workspace_image_inputs = tf.placeholder(tf.float32, (None,) + self.image_shape,
                                                     name='workspace_image_inputs')
 
-        # not all models should get current pose
-        pose_inputs = None
-        if self.model_inputs.consider_current_pose:
-            pose_inputs = {
-                p.tuple: tf.placeholder(tf.float32, (None, self.pose_dimensions), name='pose_inputs_{}'.format(p.str))
-                for p in self.potential_points
-            }
+        goal_pose_inputs = None
+        if self.config['model']['consider_goal_pose']:
+            goal_pose_inputs = tf.placeholder(tf.float32, (None, self.pose_dimensions), name='goal_pose_inputs')
+        return joints_inputs, workspace_image_inputs, goal_joints_inputs, goal_pose_inputs
 
-        # not all models should get current jacobian
-        jacobian_inputs = None
-        if self.model_inputs.consider_current_jacobian:
-            jacobian_inputs = {
-                p.tuple: tf.placeholder(tf.float32, (None, self.number_of_joints, self.pose_dimensions),
-                                        name='jacobian_inputs_{}'.format(p.str))
-                for p in self.potential_points
-            }
-
-        # goal pose is always needed
-        goal_pose_inputs = tf.placeholder(tf.float32, (None, self.pose_dimensions), name='goal_pose_inputs')
-        goal_joints_inputs = tf.placeholder(tf.float32, (None, self.number_of_joints), name='goal_joints_inputs')
-        return joints_inputs, workspace_image_inputs, pose_inputs, jacobian_inputs, goal_pose_inputs, goal_joints_inputs
-
-    def _create_actor_network(self, create_losses, create_summaries):
-        action, pose_force, extra_loss, actor_summaries = self._predict_action(create_losses, create_summaries)
-        if action is None:
-            if pose_force is None:
-                print "error: pose force cannot be null"
-                exit()
-            action = self._apply_geometric_knowledge(pose_force)
-        action = tf.nn.l2_normalize(action, 1)
-
-        return action, pose_force, extra_loss, actor_summaries
-
-    def _create_critic_network(self, is_online):
-        features = [self.goal_pose_inputs, self.goal_joints_inputs]
+    def _generate_features(self):
+        # features = [self.joints_inputs, self.goal_joints_inputs]
+        features = [self.joints_inputs, self.goal_joints_inputs, self.goal_joints_inputs-self.joints_inputs]
         if self.workspace_image_inputs is not None:
             perception = DqnModel()
             features.append(perception.predict(self.workspace_image_inputs))
-        if self.joints_inputs is not None:
-            features.append(self.joints_inputs)
-            features.append(self.goal_joints_inputs - self.joints_inputs)
-        if self.pose_inputs is not None:
-            features += self.pose_inputs.values()
-        if self.jacobian_inputs is not None:
-            features += [tf.layers.flatten(j) for j in self.jacobian_inputs.values()]
+        if self.goal_pose_inputs is not None:
+            features.append(self.goal_pose_inputs)
+        return tf.concat(features, axis=1)
 
+    def _create_actor_network(self, create_losses, create_summaries):
+        hidden_layers_after_combine = self.config['action_predictor']['layers']
+        activation = get_activation(self.config['action_predictor']['activation'])
+        layers = hidden_layers_after_combine + [self.number_of_joints]
+        current = self.network_features
+        extra_loss = None
+        actor_summaries = None
+        for i, layer_size in enumerate(layers):
+            if i == len(layers) - 1:
+                current = tf.layers.dense(current, layer_size, activation=None)
+                if self.config['action_predictor']['tanh_preactivation_loss_coefficient'] > 0.0:
+                    tanh_preactivation_loss = tf.losses.mean_squared_error(tf.zeros_like(current), current)
+                    tanh_preactivation_loss *= self.config['action_predictor']['tanh_preactivation_loss_coefficient']
+                    if create_losses:
+                        extra_loss = tanh_preactivation_loss
+                    if create_summaries:
+                        actor_summaries = tf.summary.scalar('tanh_preactivation_loss', tanh_preactivation_loss)
+                current = tf.nn.tanh(current)
+            else:
+                current = tf.layers.dense(current, layer_size, activation=activation)  # this was the last active
+
+        action = tf.nn.l2_normalize(current, 1)
+
+        return action, extra_loss, actor_summaries
+
+    def _create_critic_network(self, is_online):
         layers_before_action = self.config['critic']['layers_before_action']
         layers_after_action = self.config['critic']['layers_after_action'] + [1]
         activation = get_activation(self.config['critic']['activation'])
 
-        current = tf.concat(features, axis=1)
+        current = self.network_features
         scale = self.config['critic']['l2_regularization_coefficient'] if is_online else 0.0
         for i, layer_size in enumerate(layers_before_action):
             # current = tf.layers.dense(current, layer_size, activation=activation)
@@ -232,59 +222,36 @@ class Network(object):
 
         return q_value
 
-    def _predict_action(self, create_losses, create_summaries):
-        action = None
-        pose_force = None
-        extra_loss = None
-        actor_summaries = None
-        return action, pose_force, extra_loss, actor_summaries
-
-    def _apply_geometric_knowledge(self, pose_force):
-        assert self.jacobian_inputs is not None
-        applied_jacobian = {p.str: tf.reshape(
-            tf.matmul(self.jacobian_inputs[p.tuple], tf.expand_dims(pose_force[p.tuple], axis=2)),
-            (-1, self.number_of_joints)
-        ) for p in self.potential_points}
-        action = tf.add_n(applied_jacobian.values())
-        return action
-
-    def train_critic(
-            self, joint_inputs, workspace_image_inputs, pose_inputs, jacobian_inputs, goal_pose_inputs,
-            goal_joints_inputs, action_inputs, q_label, sess
-    ):
+    def train_critic(self, joint_inputs, workspace_image_inputs, goal_pose_inputs, goal_joints_inputs, action_inputs, q_label, sess):
         feed_dictionary = self._generate_feed_dictionary(
-            joint_inputs, workspace_image_inputs, pose_inputs, jacobian_inputs, goal_pose_inputs, goal_joints_inputs,
-            action_inputs
+            joint_inputs, workspace_image_inputs, goal_pose_inputs, goal_joints_inputs, action_inputs
         )
         feed_dictionary[self.use_policy] = False
         feed_dictionary[self.q_label] = q_label
         return sess.run([self.critic_optimization_summaries, self.optimize_critic], feed_dictionary)
 
-    def train_actor(
-            self, joint_inputs, workspace_image_inputs, pose_inputs, jacobian_inputs, goal_pose_inputs,
-            goal_joints_inputs, sess
-    ):
+    def train_actor(self, joint_inputs, workspace_image_inputs, goal_pose_inputs, goal_joints_inputs, sess):
         feed_dictionary = self._generate_feed_dictionary(
-            joint_inputs, workspace_image_inputs, pose_inputs, jacobian_inputs, goal_pose_inputs, goal_joints_inputs,
+            joint_inputs, workspace_image_inputs, goal_pose_inputs, goal_joints_inputs
         )
         feed_dictionary[self.use_policy] = True
         return sess.run([self.actor_optimization_summaries, self.optimize_actor], feed_dictionary)
 
-    def predict_q(self, joint_inputs, workspace_image_inputs, pose_inputs, jacobian_inputs, goal_pose_inputs,
-                  goal_joints_inputs, sess, use_online_network, action_inputs=None):
+    def predict_q(
+            self, joint_inputs, workspace_image_inputs, goal_pose_inputs, goal_joints_inputs, sess, use_online_network,
+            action_inputs=None
+    ):
         feed_dictionary = self._generate_feed_dictionary(
-            joint_inputs, workspace_image_inputs, pose_inputs, jacobian_inputs, goal_pose_inputs, goal_joints_inputs,
-            action_inputs
+            joint_inputs, workspace_image_inputs, goal_pose_inputs, goal_joints_inputs, action_inputs
         )
         feed_dictionary[self.use_policy] = action_inputs is None
         return sess.run(self.online_q_value if use_online_network else self.target_q_value, feed_dictionary)
 
     def predict_action(
-            self, joint_inputs, workspace_image_inputs, pose_inputs, jacobian_inputs, goal_pose_inputs,
-            goal_joints_inputs, sess, use_online_network
+            self, joint_inputs, workspace_image_inputs, goal_pose_inputs, goal_joints_inputs, sess, use_online_network
     ):
         feed_dictionary = self._generate_feed_dictionary(
-            joint_inputs, workspace_image_inputs, pose_inputs, jacobian_inputs, goal_pose_inputs, goal_joints_inputs,
+            joint_inputs, workspace_image_inputs, goal_pose_inputs, goal_joints_inputs
         )
         return sess.run(self.online_action if use_online_network else self.target_action, feed_dictionary)
 
@@ -302,23 +269,16 @@ class Network(object):
         sess.run([self.update_critic_target_params, self.update_actor_target_params])
 
     def _generate_feed_dictionary(
-            self, joints_inputs, workspace_image_inputs, pose_inputs, jacobian_inputs, goal_pose_inputs,
-            goal_joints_inputs, action_inputs=None
+            self, joints_inputs, workspace_image_inputs, goal_pose_inputs, goal_joints_inputs, action_inputs=None
     ):
         feed_dictionary = {
-            self.goal_pose_inputs: goal_pose_inputs,
+            self.joints_inputs: joints_inputs,
             self.goal_joints_inputs: goal_joints_inputs,
         }
         if action_inputs is not None:
             feed_dictionary[self.action_inputs] = action_inputs
-        if self.model_inputs.consider_current_joints:
-            feed_dictionary[self.joints_inputs] = joints_inputs
-        if self.model_inputs.consider_current_pose:
-            for p in self.potential_points:
-                feed_dictionary[self.pose_inputs[p.tuple]] = pose_inputs[p.tuple]
-        if self.model_inputs.consider_current_jacobian:
-            for p in self.potential_points:
-                feed_dictionary[self.jacobian_inputs[p.tuple]] = jacobian_inputs[p.tuple]
-        if self.model_inputs.consider_image:
+        if self.workspace_image_inputs is not None:
             feed_dictionary[self.workspace_image_inputs] = workspace_image_inputs
+        if self.goal_pose_inputs is not None:
+            feed_dictionary[self.goal_pose_inputs] = goal_pose_inputs
         return feed_dictionary

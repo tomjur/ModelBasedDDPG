@@ -35,13 +35,7 @@ model:
   potential_points: [2, 0., 0.075, 3, 0., 0.085, 4, -0.02, 0.05, 4, 0.005, 0.05, 5, 0.005, 0.035, 5, -0.02, 0.035]
   tau: 0.05
   consider_image: False
-  consider_current_joints: True
-#  consider_current_joints: False
-  consider_current_pose: True
-#  consider_current_pose: False
-#  consider_current_jacobian: True
-  consider_current_jacobian: False
-  actor: "action_predictor"
+  consider_goal_pose: True
   random_action_probability: 0.2
   random_noise_std: 0.05
 

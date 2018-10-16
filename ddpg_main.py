@@ -8,7 +8,7 @@ import numpy as np
 
 from curriculum_manager import CurriculumManager
 from hindsight_policy import HindsightPolicy
-from network_generator import get_network
+from network import Network
 from replay_buffer import ReplayBuffer
 from rollout_manager import RolloutManager
 from saver_wrapper import SaverWrapper
@@ -37,7 +37,7 @@ def run_for_config(config, print_messages):
     completed_trajectories_dir = os.path.join(working_dir, 'trajectories', model_name)
 
     # generate graph:
-    network = get_network(config, is_rollout_agent=False)
+    network = Network(config, is_rollout_agent=False)
 
     # initialize replay memory
     replay_buffer = ReplayBuffer(config)
@@ -53,15 +53,10 @@ def run_for_config(config, print_messages):
     test_results = []
 
     def unpack_state_batch(state_batch):
-        joints = None
-        poses = None
+        joints = [state[0] for state in state_batch]
+        poses = {p.tuple: [state[1][p.tuple] for state in state_batch] for p in network.potential_points}
         jacobians = None
-        if network.model_inputs.consider_current_joints:
-            joints = [state[0] for state in state_batch]
-        if network.model_inputs.consider_current_pose:
-            poses = {p.tuple: [state[1][p.tuple] for state in state_batch] for p in network.potential_points}
-        if network.model_inputs.consider_current_jacobian:
-            jacobians = {p.tuple: [state[2][p.tuple] for state in state_batch] for p in network.potential_points}
+        # jacobians = {p.tuple: [state[2][p.tuple] for state in state_batch] for p in network.potential_points}
         return joints, poses, jacobians
 
     def update_model(sess, global_step):
@@ -75,7 +70,7 @@ def run_for_config(config, print_messages):
 
         # get the predicted q value of the next state (action is taken from the target actor prediction)
         next_state_action_target_q = network.predict_q(
-            next_joints, workspace_image, next_poses, next_jacobians, goal_pose, goal_joints, sess,
+            next_joints, workspace_image, goal_pose, goal_joints, sess,
             use_online_network=False, action_inputs=None
         )
 
@@ -94,13 +89,13 @@ def run_for_config(config, print_messages):
 
         # train critic given the targets
         critic_optimization_summaries, _ = network.train_critic(
-            current_joints, workspace_image, current_poses, current_jacobians, goal_pose, goal_joints, action, q_label,
+            current_joints, workspace_image, goal_pose, goal_joints, action, q_label,
             sess
         )
 
         # train actor
         actor_optimization_summaries, _ = network.train_actor(
-            current_joints, workspace_image, current_poses, current_jacobians, goal_pose, goal_joints, sess
+            current_joints, workspace_image, goal_pose, goal_joints, sess
         )
 
         # update target networks

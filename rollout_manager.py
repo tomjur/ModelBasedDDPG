@@ -5,7 +5,7 @@ import tensorflow as tf
 import multiprocessing
 import Queue
 
-from network_generator import get_network
+from network import Network
 from openrave_rl_interface import OpenraveRLInterface
 from workspace_generation_utils import WorkspaceParams
 
@@ -33,18 +33,14 @@ class ActorProcess(multiprocessing.Process):
         result /= np.linalg.norm(result)
         return result
 
-    def _compute_state(self, joints, model_inputs):
+    def _compute_state(self, joints):
         openrave_manager = self.openrave_interface.openrave_manager
         # get the poses
-        poses = None
-        if model_inputs.consider_current_pose:
-            poses = openrave_manager.get_potential_points_poses(joints)
+        poses = openrave_manager.get_potential_points_poses(joints)
         # get the jacobians
         jacobians = None
-        if model_inputs.consider_current_jacobian:
-            jacobians = openrave_manager.get_potential_points_jacobians(joints)
         # preprocess the joints (remove first joint value)
-        joints = joints[1:] if model_inputs.consider_current_joints else None
+        joints = joints[1:]
         return joints, poses, jacobians
 
     def _run_episode(self, sess, allowed_size, is_train):
@@ -58,7 +54,7 @@ class ActorProcess(multiprocessing.Process):
         goal_pose = self.openrave_interface.openrave_manager.get_target_pose(goal_joints)
         goal_joints = goal_joints[1:]
         # set the start state
-        current_state = self._compute_state(current_joints, self.actor.model_inputs)
+        current_state = self._compute_state(current_joints)
         states.append(current_state)
         # the result of the episode
         status = None
@@ -73,15 +69,14 @@ class ActorProcess(multiprocessing.Process):
                 p.tuple: [current_state[2][p.tuple]] for p in self.actor.potential_points
             }
             action_mean = self.actor.predict_action(
-                [current_state[0]], [workspace_image], current_poses, current_jacobians, [goal_pose], [goal_joints],
-                sess, use_online_network=True
+                [current_state[0]], [workspace_image], [goal_pose], [goal_joints], sess, use_online_network=True
             )[0]
             sampled_action = self._get_sampled_action(action_mean) if is_train else action_mean
             # make an environment step
             openrave_step = np.insert(sampled_action, 0, [0.0])
             next_joints, current_reward, is_terminal, status = self.openrave_interface.step(openrave_step)
             # set a new current state
-            current_state = self._compute_state(next_joints, self.actor.model_inputs)
+            current_state = self._compute_state(next_joints)
             # update return data structures
             states.append(current_state)
             actions.append(sampled_action)
@@ -113,7 +108,7 @@ class ActorProcess(multiprocessing.Process):
                     # need to init the actor, called once.
                     assert self.actor is None
                     # on init, we only create a part of the graph (online actor model)
-                    self.actor = get_network(self.config, is_rollout_agent=True)
+                    self.actor = Network(self.config, is_rollout_agent=True)
                     sess.run(tf.global_variables_initializer())
                     self.actor_specific_queue.task_done()
                 elif task_type == 1:
