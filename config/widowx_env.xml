@@ -1,0 +1,8 @@
+<Environment>
+
+<!-- Roboter -->
+<Robot file="widowx.zae" name="widowx">
+  <translation>0.0 0.0 0.0</translation>
+</Robot>
+
+</Environment>

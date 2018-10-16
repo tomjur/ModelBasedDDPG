@@ -1,0 +1,5 @@
+*.pyc
+/models
+/tensorboard
+/_temp_scripts
+/config/*.zae
