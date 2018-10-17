@@ -91,10 +91,13 @@ class Network(object):
         # the label to use to train the online critic network
         self.q_label = tf.placeholder(tf.float32, [None, 1])
 
+        batch_size = tf.cast(tf.shape(self.goal_joints_inputs)[0], tf.float32)
+
         # critic optimization
-        critic_prediction_loss = tf.losses.mean_squared_error(self.q_label, self.online_q_value)
+        critic_prediction_loss = tf.div(tf.losses.mean_squared_error(self.q_label, self.online_q_value), batch_size)
         critic_regularization = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
-        critic_regularization_loss = tf.add_n(critic_regularization) if len(critic_regularization) > 0 else 0.0
+        critic_regularization_loss = tf.div(tf.add_n(critic_regularization), batch_size) \
+            if len(critic_regularization) > 0 else 0.0
         critic_total_loss = critic_prediction_loss + critic_regularization_loss
 
         critic_initial_gradients_norm, critic_clipped_gradients_norm, self.optimize_critic = self._optimize_by_loss(
@@ -117,8 +120,7 @@ class Network(object):
         if actor_extra_losses is not None:
             actor_loss += actor_extra_losses
         # divide by the batch size
-        batch_size = tf.shape(self.goal_joints_inputs)[0]
-        actor_loss = tf.div(actor_loss, tf.cast(batch_size, tf.float32))
+        actor_loss = tf.div(actor_loss, batch_size)
 
         actor_initial_gradients_norm, actor_clipped_gradients_norm, self.optimize_actor = self._optimize_by_loss(
             actor_loss, self.online_actor_params, self.config['actor']['learning_rate'],
@@ -161,8 +163,8 @@ class Network(object):
         return joints_inputs, workspace_image_inputs, goal_joints_inputs, goal_pose_inputs
 
     def _generate_features(self):
-        # features = [self.joints_inputs, self.goal_joints_inputs]
-        features = [self.joints_inputs, self.goal_joints_inputs, self.goal_joints_inputs-self.joints_inputs]
+        features = [self.joints_inputs, self.goal_joints_inputs]
+        # features = [self.joints_inputs, self.goal_joints_inputs, self.goal_joints_inputs-self.joints_inputs]
         if self.workspace_image_inputs is not None:
             perception = DqnModel()
             features.append(perception.predict(self.workspace_image_inputs))
