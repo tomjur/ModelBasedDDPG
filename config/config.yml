@@ -38,6 +38,8 @@ model:
   consider_goal_pose: True
   random_action_probability: 0.2
   random_noise_std: 0.05
+#  use_reward_model: True
+  use_reward_model: False
 
 test:
   test_every_cycles: 50
@@ -67,7 +69,7 @@ actor:
 action_predictor:
   layers: [200, 200, 200, 200]
 #  layers: [64, 64, 64]
-  activation: 'relu'
+  activation: 'elu'
   tanh_preactivation_loss_coefficient: 1.0
 #  tanh_preactivation_loss_coefficient: 0.0
 
@@ -76,12 +78,21 @@ critic:
 #  learning_rate: 0.0001
 #  gradient_limit: 10.0
   gradient_limit: 0.0
-  layers_before_action: [200]
+  layers_before_action: [200, 200]
   layers_after_action: [200, 200, 200]
 #  layers_before_action: [64]
 #  layers_after_action: [64, 64]
-  activation: 'relu'
+  activation: 'elu'
   l2_regularization_coefficient: 0.0
 #  l2_regularization_coefficient: 0.0001
+
+reward:
+  learning_rate: 0.001
+#  learning_rate: 0.0001
+#  gradient_limit: 10.0
+  gradient_limit: 0.0
+  layers_before_action: [200, 200]
+  layers_after_action: [200, 200, 200]
+  activation: 'elu'
 
 

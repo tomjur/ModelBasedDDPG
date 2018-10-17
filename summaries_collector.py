@@ -55,9 +55,13 @@ class SummariesCollector:
 
         return write_curriculum_summaries
 
-    def write_train_optimization_summaries(self, critic_summaries, actor_summaries, global_step):
+    def write_train_optimization_summaries(
+            self, critic_summaries, actor_summaries, reward_summaries, global_step
+    ):
         self._train_summary_writer.add_summary(critic_summaries, global_step)
         self._train_summary_writer.add_summary(actor_summaries, global_step)
+        if reward_summaries is not None:
+            self._train_summary_writer.add_summary(reward_summaries, global_step)
         self._train_summary_writer.flush()
 
 

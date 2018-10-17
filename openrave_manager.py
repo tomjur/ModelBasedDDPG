@@ -27,6 +27,7 @@ class OpenraveManager(object):
         self.segment_validity_step = segment_validity_step
         # translate the potential to list of (unprocessed_point, link, coordinate)
         self.potential_points = potential_points
+        self.joint_safety = 0.0001
 
     def load_params(self, workspace_params):
         with self.env:
@@ -68,13 +69,13 @@ class OpenraveManager(object):
         return tuple(result)
 
     def truncate_joints(self, joints):
-        safety = 0.0001
+
         bounds = self.get_joint_bounds()
         res = list(joints)
         for i, j in enumerate(joints):
-            lower = bounds[0][i] + safety
+            lower = bounds[0][i] + self.joint_safety
             res[i] = max(res[i], lower)
-            upper = bounds[1][i] - safety
+            upper = bounds[1][i] - self.joint_safety
             res[i] = min(res[i], upper)
         return tuple(res)
 
