@@ -38,8 +38,8 @@ model:
   consider_goal_pose: True
   random_action_probability: 0.2
   random_noise_std: 0.05
-#  use_reward_model: True
-  use_reward_model: False
+  use_reward_model: True
+#  use_reward_model: False
 
 test:
   test_every_cycles: 50
@@ -91,8 +91,8 @@ reward:
 #  learning_rate: 0.0001
 #  gradient_limit: 10.0
   gradient_limit: 0.0
-  layers_before_action: [200, 200]
-  layers_after_action: [200, 200, 200]
+  layers_before_action: [50, 50]
+  layers_after_action: [50, 50]
   activation: 'elu'
 
 

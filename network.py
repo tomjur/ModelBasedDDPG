@@ -4,7 +4,6 @@ import tensorflow.contrib.layers as layers
 
 from dqn_model import DqnModel
 from modeling_utils import get_activation
-from openrave_manager import OpenraveManager
 from potential_point import PotentialPoint
 
 
@@ -78,7 +77,7 @@ class Network(object):
             ) for i in range(len(target_actor_params))]
 
         # create inputs for the critic and reward network when using a constant action
-        self.action_inputs = tf.placeholder_with_default(input=[[0.0]*4], shape=[None, self.number_of_joints])
+        self.action_inputs = tf.placeholder(tf.float32, (None, self.number_of_joints), name='action_inputs')
 
         # online critic for predicting the q value for a specific joints+action pair
         variable_count = len(tf.trainable_variables())
@@ -112,26 +111,30 @@ class Network(object):
                 tf.multiply(online_critic_params[i], tau) + tf.multiply(target_critic_params[i], 1. - tau)
             ) for i in range(len(target_critic_params))]
 
-        self.fixed_action_reward, self.online_action_reward = None, None
+        self.fixed_action_reward, self.online_action_reward, reward_params = None, None, None
         if use_reward_model:
             # reward network to predict the immediate reward of a given action
+            variable_count = len(tf.trainable_variables())
             self.fixed_action_reward = self._create_reward_network(
                 self.joints_inputs, self.action_inputs, reuse_flag=False)
+            reward_params = tf.trainable_variables()[variable_count:]
             # reward network to predict the immediate reward of the online policy action
+            variable_count = len(tf.trainable_variables())
             self.online_action_reward = self._create_reward_network(
                 self.joints_inputs, self.online_action, reuse_flag=True)
+            assert variable_count == len(tf.trainable_variables())
 
         # the label to use to train the online critic network or reward network
         self.scalar_label = tf.placeholder(tf.float32, [None, 1])
 
-        batch_size = tf.cast(tf.shape(self.goal_joints_inputs)[0], tf.float32)
+        batch_size = tf.cast(tf.shape(self.joints_inputs)[0], tf.float32)
 
         self.optimize_reward, self.reward_optimization_summaries = None, None
         if use_reward_model:
             # reward network optimization
             reward_loss = tf.div(tf.losses.mean_squared_error(self.scalar_label, self.fixed_action_reward), batch_size)
             reward_initial_gradients_norm, reward_clipped_gradients_norm, self.optimize_reward = self._optimize_by_loss(
-                reward_loss, online_critic_params, self.config['reward']['learning_rate'],
+                reward_loss, reward_params, self.config['reward']['learning_rate'],
                 self.config['reward']['gradient_limit']
             )
             # summaries for the reward optimization
@@ -231,15 +234,13 @@ class Network(object):
             goal_pose_inputs = tf.placeholder(tf.float32, (None, self.pose_dimensions), name='goal_pose_inputs')
         return joints_inputs, workspace_image_inputs, goal_joints_inputs, goal_pose_inputs
 
-    def _generate_policy_features(self, current_joints, include_goal_information=True):
-        features = [current_joints]
-        if include_goal_information:
-            features.append(self.goal_joints_inputs)
-            # features.append(self.goal_joints_inputs - current_joints)
+    def _generate_policy_features(self, current_joints):
+        features = [current_joints, self.goal_joints_inputs]
+        # features.append(self.goal_joints_inputs - current_joints)
         if self.workspace_image_inputs is not None:
             perception = DqnModel()
             features.append(perception.predict(self.workspace_image_inputs))
-        if self.goal_pose_inputs is not None and include_goal_information:
+        if self.goal_pose_inputs is not None:
             features.append(self.goal_pose_inputs)
         return tf.concat(features, axis=1)
 
@@ -249,11 +250,11 @@ class Network(object):
         step = self.online_action * action_step_size
         result = self.joints_inputs + step
         # we initiate an openrave manager to get the robot, to get the joint bounds and the safety
-        openrave_manager = OpenraveManager(0.0, self.potential_points)
-        joint_bounds = openrave_manager.get_joint_bounds()
-        joint_safety = openrave_manager.joint_safety
-        lower_bounds = joint_bounds[0] + joint_safety
-        upper_bounds = joint_bounds[1] - joint_safety
+        joint_safety = 0.0001
+        lower_bounds = [-2.617, -1.571, -1.571, -1.745, -2.617]
+        lower_bounds = [b + joint_safety for b in lower_bounds[1:]]
+        upper_bounds = [-b for b in lower_bounds]
+
         # clip the result
         result = tf.maximum(result, lower_bounds)
         result = tf.minimum(result, upper_bounds)
@@ -304,7 +305,7 @@ class Network(object):
         layers_after_action = self.config['reward']['layers_after_action'] + [1]
         activation = get_activation(self.config['reward']['activation'])
 
-        current = self._generate_policy_features(joints_input, include_goal_information=False)
+        current = self._generate_policy_features(joints_input)
         for i, layer_size in enumerate(layers_before_action):
             current = tf.layers.dense(
                 current, layer_size, activation=activation, name='{}_before_action_{}'.format(name_prefix, i),
@@ -329,11 +330,14 @@ class Network(object):
         feed_dictionary[self.scalar_label] = q_label
         return sess.run([self.critic_optimization_summaries, self.optimize_critic], feed_dictionary)
 
-    def train_reward(self, joint_inputs, workspace_image_inputs, action_inputs, observed_reward, sess):
+    def train_reward(
+            self, joint_inputs, workspace_image_inputs, goal_pose_inputs, goal_joints_inputs, action_inputs,
+            observed_reward, sess
+    ):
         if self.optimize_reward is None:
             return None, None
         feed_dictionary = self._generate_feed_dictionary(
-            joint_inputs, workspace_image_inputs, action_inputs=action_inputs
+            joint_inputs, workspace_image_inputs, goal_pose_inputs, goal_joints_inputs, action_inputs
         )
         feed_dictionary[self.scalar_label] = observed_reward
         return sess.run([self.reward_optimization_summaries, self.optimize_reward], feed_dictionary)
@@ -363,17 +367,21 @@ class Network(object):
         )
         return sess.run(self.online_q_value_fixed_action, feed_dictionary)
 
-    def predict_policy_reward(self, joint_inputs, workspace_image_inputs, sess):
+    def predict_policy_reward(self, joint_inputs, workspace_image_inputs, goal_pose_inputs, goal_joints_inputs, sess):
         if self.online_action_reward is None:
             return None
-        feed_dictionary = self._generate_feed_dictionary(joint_inputs, workspace_image_inputs)
+        feed_dictionary = self._generate_feed_dictionary(
+            joint_inputs, workspace_image_inputs, goal_pose_inputs, goal_joints_inputs
+        )
         return sess.run(self.online_action_reward, feed_dictionary)
 
-    def predict_fixed_action_reward(self, joint_inputs, workspace_image_inputs, action_inputs, sess):
+    def predict_fixed_action_reward(
+            self, joint_inputs, workspace_image_inputs, goal_pose_inputs, goal_joints_inputs, action_inputs, sess
+    ):
         if self.fixed_action_reward is None:
             return None
         feed_dictionary = self._generate_feed_dictionary(
-            joint_inputs, workspace_image_inputs, action_inputs=action_inputs
+            joint_inputs, workspace_image_inputs, goal_pose_inputs, goal_joints_inputs, action_inputs
         )
         return sess.run(self.fixed_action_reward, feed_dictionary)
 
@@ -399,17 +407,16 @@ class Network(object):
         sess.run([self.update_critic_target_params, self.update_actor_target_params])
 
     def _generate_feed_dictionary(
-            self, joints_inputs, workspace_image_inputs, goal_pose_inputs=None, goal_joints_inputs=None, action_inputs=None
+            self, joints_inputs, workspace_image_inputs, goal_pose_inputs, goal_joints_inputs, action_inputs=None
     ):
         feed_dictionary = {
             self.joints_inputs: joints_inputs,
+            self.goal_joints_inputs: goal_joints_inputs,
         }
-        if goal_joints_inputs is not None:
-            feed_dictionary[self.goal_joints_inputs] = goal_joints_inputs
         if action_inputs is not None:
             feed_dictionary[self.action_inputs] = action_inputs
         if self.workspace_image_inputs is not None:
             feed_dictionary[self.workspace_image_inputs] = workspace_image_inputs
-        if self.goal_pose_inputs is not None and goal_pose_inputs is not None:
+        if self.goal_pose_inputs is not None:
             feed_dictionary[self.goal_pose_inputs] = goal_pose_inputs
         return feed_dictionary

@@ -93,7 +93,10 @@ def run_for_config(config, print_messages):
 
         reward_optimization_summaries = None
         if config['model']['use_reward_model']:
-            reward_optimization_summaries = network.train_reward(current_joints, workspace_image, action, reward, sess)
+            reward_input = np.expand_dims(np.array(reward), axis=1)
+            reward_optimization_summaries, _ = network.train_reward(
+                current_joints, workspace_image, goal_pose, goal_joints, action, reward_input, sess
+            )
 
         # train actor
         actor_optimization_summaries, _ = network.train_actor(
