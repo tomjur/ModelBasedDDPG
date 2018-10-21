@@ -93,9 +93,18 @@ def run_for_config(config, print_messages):
 
         reward_optimization_summaries = None
         if config['model']['use_reward_model']:
+            # train reward if needed
             reward_input = np.expand_dims(np.array(reward), axis=1)
             reward_optimization_summaries, _ = network.train_reward(
                 current_joints, workspace_image, goal_pose, goal_joints, action, reward_input, sess
+            )
+
+        termination_optimization_summaries = None
+        if config['model']['use_reward_model']:
+            # train termination if needed
+            termination_input = np.expand_dims(np.array(terminated, dtype=np.float32), axis=1)
+            termination_optimization_summaries, _ = network.train_termination(
+                current_joints, workspace_image, goal_pose, goal_joints, action, termination_input, sess
             )
 
         # train actor
@@ -106,7 +115,12 @@ def run_for_config(config, print_messages):
         # update target networks
         network.update_target_networks(sess)
 
-        return critic_optimization_summaries, actor_optimization_summaries, reward_optimization_summaries
+        result = [
+            critic_optimization_summaries, actor_optimization_summaries, reward_optimization_summaries,
+            termination_optimization_summaries
+        ]
+
+        return result
 
     def print_state(prefix, episodes, successful_episodes, collision_episodes, max_len_episodes):
         if not print_messages:
@@ -165,16 +179,12 @@ def run_for_config(config, print_messages):
             if replay_buffer.size() > config['model']['intial_samples_before_train']:
                 a = datetime.datetime.now()
                 for _ in range(config['general']['model_updates_per_cycle']):
-                    critic_optimization_summaries, actor_optimization_summaries, reward_optimization_summaries = \
-                        update_model(sess, global_step)
+                    summaries = update_model(sess, global_step)
                     if global_step % config['general']['write_train_summaries'] == 0:
                         summaries_collector.write_train_episode_summaries(
                             sess, global_step, episodes, successful_episodes, collision_episodes, max_len_episodes
                         )
-                        summaries_collector.write_train_optimization_summaries(
-                            critic_optimization_summaries, actor_optimization_summaries, reward_optimization_summaries,
-                            global_step
-                        )
+                        summaries_collector.write_train_optimization_summaries(summaries, global_step)
                     global_step += 1
                 b = datetime.datetime.now()
                 print 'update took: {}'.format(b - a)

@@ -9,6 +9,7 @@ general:
   gpu_usage: 0.01
   actor_gpu_usage: 0.01
   actor_processes: 8
+#  actor_processes: 1
   write_train_summaries: 500
 
 openrave_rl:
@@ -87,6 +88,15 @@ critic:
 #  l2_regularization_coefficient: 0.0001
 
 reward:
+  learning_rate: 0.001
+#  learning_rate: 0.0001
+#  gradient_limit: 10.0
+  gradient_limit: 0.0
+  layers_before_action: [50, 50]
+  layers_after_action: [50, 50]
+  activation: 'elu'
+
+termination:
   learning_rate: 0.001
 #  learning_rate: 0.0001
 #  gradient_limit: 10.0
