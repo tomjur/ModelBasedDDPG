@@ -129,12 +129,12 @@ class Network(object):
             # reward network to predict the immediate reward of a given action
             variable_count = len(tf.trainable_variables())
             self.fixed_action_termination = self._create_termination_network(
-                self.joints_inputs, self.action_inputs, reuse_flag=False)
+                self.joints_inputs, reuse_flag=False)
             termination_params = tf.trainable_variables()[variable_count:]
             # reward network to predict the immediate reward of the online policy action
             variable_count = len(tf.trainable_variables())
             self.online_action_termination = self._create_termination_network(
-                self.joints_inputs, self.online_action, reuse_flag=True)
+                forward_model_next_state, reuse_flag=True)
             assert variable_count == len(tf.trainable_variables())
 
         # the label to use to train the online critic network or reward network or termination network
@@ -167,7 +167,7 @@ class Network(object):
                 self._optimize_by_loss(
                     termination_loss, termination_params, self.config['termination']['learning_rate'],
                     self.config['termination']['gradient_limit']
-            )
+                )
             # summaries for the termination optimization
             self.termination_optimization_summaries = tf.summary.merge([
                 tf.summary.scalar('termination_loss', termination_loss),
@@ -352,23 +352,15 @@ class Network(object):
             )
         return current
 
-    def _create_termination_network(self, joints_input, action_input, reuse_flag):
+    def _create_termination_network(self, joints_input, reuse_flag):
         name_prefix = '{}_termination'.format(os.getpid())
-        layers_before_action = self.config['termination']['layers_before_action']
-        layers_after_action = self.config['termination']['layers_after_action'] + [1]
+        layers = self.config['termination']['layers'] + [1]
         activation = get_activation(self.config['termination']['activation'])
-
         current = self._generate_policy_features(joints_input)
-        for i, layer_size in enumerate(layers_before_action):
+        for i, layer_size in enumerate(layers):
+            _activation = tf.nn.sigmoid if i == len(layers) - 1 else activation
             current = tf.layers.dense(
-                current, layer_size, activation=activation, name='{}_before_action_{}'.format(name_prefix, i),
-                reuse=reuse_flag
-            )
-        current = tf.concat((current, action_input), axis=1)
-        for i, layer_size in enumerate(layers_after_action):
-            _activation = tf.nn.sigmoid if i == len(layers_after_action) - 1 else activation
-            current = tf.layers.dense(
-                current, layer_size, activation=_activation, name='{}_after_action_{}'.format(name_prefix, i),
+                current, layer_size, activation=_activation, name='{}_{}'.format(name_prefix, i),
                 reuse=reuse_flag
             )
         return current
@@ -396,13 +388,12 @@ class Network(object):
         return sess.run([self.reward_optimization_summaries, self.optimize_reward], feed_dictionary)
 
     def train_termination(
-            self, joint_inputs, workspace_image_inputs, goal_pose_inputs, goal_joints_inputs, action_inputs,
-            observed_termination, sess
+            self, joint_inputs, workspace_image_inputs, goal_pose_inputs, goal_joints_inputs, observed_termination, sess
     ):
         if self.optimize_reward is None:
             return None, None
         feed_dictionary = self._generate_feed_dictionary(
-            joint_inputs, workspace_image_inputs, goal_pose_inputs, goal_joints_inputs, action_inputs
+            joint_inputs, workspace_image_inputs, goal_pose_inputs, goal_joints_inputs
         )
         feed_dictionary[self.scalar_label] = observed_termination
         return sess.run([self.termination_optimization_summaries, self.optimize_termination], feed_dictionary)

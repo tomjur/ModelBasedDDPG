@@ -104,7 +104,7 @@ def run_for_config(config, print_messages):
             # train termination if needed
             termination_input = np.expand_dims(np.array(terminated, dtype=np.float32), axis=1)
             termination_optimization_summaries, _ = network.train_termination(
-                current_joints, workspace_image, goal_pose, goal_joints, action, termination_input, sess
+                next_joints, workspace_image, goal_pose, goal_joints, termination_input, sess
             )
 
         # train actor
