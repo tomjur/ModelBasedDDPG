@@ -62,12 +62,12 @@ class ActorProcess(multiprocessing.Process):
         max_steps = int(steps_required_for_motion_plan * self.config['general']['max_path_slack'])
         for j in range(max_steps):
             # do a single step prediction
-            current_poses = None if current_state[1] is None else {
-                p.tuple: [current_state[1][p.tuple]] for p in self.actor.potential_points
-            }
-            current_jacobians = None if current_state[2] is None else {
-                p.tuple: [current_state[2][p.tuple]] for p in self.actor.potential_points
-            }
+            # current_poses = None if current_state[1] is None else {
+            #     p.tuple: [current_state[1][p.tuple]] for p in self.actor.potential_points
+            # }
+            # current_jacobians = None if current_state[2] is None else {
+            #     p.tuple: [current_state[2][p.tuple]] for p in self.actor.potential_points
+            # }
             action_mean = self.actor.predict_action(
                 [current_state[0]], [workspace_image], [goal_pose], [goal_joints], sess, use_online_network=True
             )[0]
