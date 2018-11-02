@@ -8,7 +8,8 @@ general:
   max_path_slack: 1.5
   gpu_usage: 0.01
   actor_gpu_usage: 0.01
-  actor_processes: 8
+  actor_processes: 2
+  collector_processes: 4
 #  actor_processes: 1
   write_train_summaries: 500
 
@@ -39,8 +40,8 @@ model:
   consider_goal_pose: True
   random_action_probability: 0.2
   random_noise_std: 0.05
-  use_reward_model: True
-#  use_reward_model: False
+#  use_reward_model: True
+  use_reward_model: False
 
 test:
   test_every_cycles: 50
@@ -76,33 +77,35 @@ action_predictor:
 
 critic:
   learning_rate: 0.001
-#  learning_rate: 0.0001
-#  gradient_limit: 10.0
-  gradient_limit: 0.0
+  gradient_limit: 1.0
+#  gradient_limit: 0.0
   layers_before_action: [200, 200]
   layers_after_action: [200, 200, 200]
+#  layers_before_action: [400, 400]
+#  layers_after_action: [400, 400, 400]
 #  layers_before_action: [64]
 #  layers_after_action: [64, 64]
   activation: 'elu'
-  l2_regularization_coefficient: 0.0
-#  l2_regularization_coefficient: 0.0001
+#  l2_regularization_coefficient: 0.0
+  l2_regularization_coefficient: 0.0001
 
 reward:
   learning_rate: 0.001
 #  learning_rate: 0.0001
 #  gradient_limit: 10.0
   gradient_limit: 0.0
-  layers_before_action: [50, 50]
-  layers_after_action: [50, 50]
+#  layers_before_action: [20, 20, 20]
+#  layers_after_action: [20, 20, 20]
   activation: 'elu'
+  layers: [50, 50, 50]
+  l2_regularization_coefficient: 0.0001
 
 termination:
   learning_rate: 0.001
 #  learning_rate: 0.0001
 #  gradient_limit: 10.0
   gradient_limit: 0.0
-  layers_before_action: [50, 50]
-  layers_after_action: [50, 50]
+  layers: [50, 50]
   activation: 'elu'
 
 

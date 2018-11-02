@@ -40,12 +40,9 @@ class OpenraveRLInterface:
         pose_distance = np.linalg.norm(np.array(start_pose) - np.array(goal_pose))
         return pose_distance < self.goal_sensitivity
 
-    def start_new_random(self, allowed_start_goal_difference=None):
-        start_joints = None
-        goal_joints = None
-        self.traj = None
+    def find_random_trajectory(self, allowed_start_goal_difference=None):
         lower_size = 0.0  # when doing curriculum, this this is the lowest possible distance between start and goal
-        while self.traj is None:
+        while True:
             # select at random
             start_joints = self.openrave_manager.get_random_joints({0: 0.0})
             goal_joints = self.openrave_manager.get_random_joints({0: 0.0})
@@ -54,7 +51,7 @@ class OpenraveRLInterface:
                 direction = np.array(goal_joints) - np.array(start_joints)
                 direction_size = np.linalg.norm(direction)
                 direction /= direction_size  # direction is size 1.0 now
-                direction *= np.random.uniform(lower_size, allowed_start_goal_difference) # now in valid range
+                direction *= np.random.uniform(lower_size, allowed_start_goal_difference)  # now in valid range
                 goal_joints = list(np.array(start_joints) + np.array(direction))
                 goal_joints = self.openrave_manager.truncate_joints(goal_joints)
                 distance = np.linalg.norm(np.array(start_joints) - np.array(goal_joints))
@@ -72,14 +69,21 @@ class OpenraveRLInterface:
             # trajectories that must cross an obstacle
             if self.challenging_trajectories_only and not self._is_challenging(start_pose, goal_pose):
                 continue
-            self.traj = self.openrave_manager.plan(start_joints, goal_joints, self.max_planner_iterations)
-            if self.traj is None:
+            traj = self.openrave_manager.plan(start_joints, goal_joints, self.max_planner_iterations)
+            if traj is None:
                 # if failed to plan, give more power
                 self.max_planner_iterations += self.planner_iterations_increase
             elif self.max_planner_iterations > self.planner_iterations_start + self.planner_iterations_decrease:
                 # if plan was found, maybe we need less iterations
                 self.max_planner_iterations -= self.planner_iterations_decrease
-        self.traj = self._split_trajectory(self.traj)
+                return self._split_trajectory(traj), start_joints, goal_joints
+
+    def start_new_random(self, allowed_start_goal_difference=None):
+        traj, start_joints, goal_joints = self.find_random_trajectory(allowed_start_goal_difference)
+        return self.start_specific(traj, start_joints, goal_joints)
+
+    def start_specific(self, traj, start_joints, goal_joints):
+        self.traj = traj
         path_length = self._compute_length(self.traj)
         steps_required_for_motion_plan = max([int(path_length / self.action_step_size), 1])
         # set the new trajectory parameters

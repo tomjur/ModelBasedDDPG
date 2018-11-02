@@ -20,7 +20,7 @@ class TrajectoryEval:
         episodes = 0
         mean_total_reward = 0.0
         number_of_episodes = self.config['test']['number_of_episodes']
-        episode_results = self.rollout_manager.generate_episodes(number_of_episodes, allowed_distance, False)
+        episode_results = self.rollout_manager.generate_episodes(number_of_episodes, False)
         for episode_result in episode_results:
             status = episode_result[0]
             states = episode_result[1]

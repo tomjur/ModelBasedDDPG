@@ -62,8 +62,10 @@ def run_for_config(config, print_messages):
     def update_model(sess, global_step):
         batch_size = config['model']['batch_size']
         gamma = config['model']['gamma']
+        replay_buffer_batch = replay_buffer.sample_batch(batch_size)
+
         goal_pose, goal_joints, workspace_image, current_state, action, reward, terminated, next_state = \
-            replay_buffer.sample_batch(batch_size)
+            replay_buffer_batch
 
         current_joints, current_poses, current_jacobians = unpack_state_batch(current_state)
         next_joints, next_poses, next_jacobians = unpack_state_batch(next_state)
@@ -155,10 +157,20 @@ def run_for_config(config, print_messages):
             a = datetime.datetime.now()
             rollout_manager.set_policy_weights(network.get_actor_online_weights(sess))
             episodes_per_update = config['general']['episodes_per_update']
-            episode_results = rollout_manager.generate_episodes(episodes_per_update, allowed_size, True)
+            episode_results = rollout_manager.generate_episodes(episodes_per_update, True)
+            total_find_trajectory_time = None
+            total_rollout_time = None
             for episode_result in episode_results:
                 # run episode:
-                status, states, actions, rewards, goal_pose, goal_joints, workspace_image = episode_result
+                status, states, actions, rewards, goal_pose, goal_joints, workspace_image, find_trajectory_time, rollout_time = episode_result
+                if total_find_trajectory_time is None:
+                    total_find_trajectory_time = find_trajectory_time
+                else:
+                    total_find_trajectory_time += find_trajectory_time
+                if total_rollout_time is None:
+                    total_rollout_time = rollout_time
+                else:
+                    total_rollout_time += rollout_time
                 # at the end of episode
                 hindsight_policy.append_to_replay_buffer(
                     status, states, actions, rewards, goal_pose, goal_joints, workspace_image
@@ -173,6 +185,8 @@ def run_for_config(config, print_messages):
                     successful_episodes += 1
             b = datetime.datetime.now()
             print 'data collection took: {}'.format(b-a)
+            print 'find trajectory took: {}'.format(total_find_trajectory_time)
+            print 'rollout time took: {}'.format(total_rollout_time)
             print_state('train', episodes, successful_episodes, collision_episodes, max_len_episodes)
 
             # do updates

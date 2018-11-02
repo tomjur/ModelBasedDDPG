@@ -4,10 +4,47 @@ import numpy as np
 import tensorflow as tf
 import multiprocessing
 import Queue
+import datetime
 
 from network import Network
 from openrave_rl_interface import OpenraveRLInterface
 from workspace_generation_utils import WorkspaceParams
+
+
+class QueryCollectorProcess(multiprocessing.Process):
+    def __init__(self, config, result_queue, collector_specific_queue):
+        multiprocessing.Process.__init__(self)
+        self.result_queue = result_queue
+        self.collector_specific_queue = collector_specific_queue
+        self.config = config
+        self.openrave_interface = None
+
+    def _run_main_loop(self):
+        episodes_per_update = self.config['general']['episodes_per_update']
+        required_trajectories = episodes_per_update * 10
+        while True:
+            try:
+                next_collector_specific_task = self.collector_specific_queue.get(block=True, timeout=0.001)
+                task_type = next_collector_specific_task[0]
+                # can only terminate
+                self.collector_specific_queue.task_done()
+                break
+            except Queue.Empty:
+                pass
+            if self.result_queue.qsize() < required_trajectories:
+                result = self.openrave_interface.find_random_trajectory()
+                self.result_queue.put(result)
+
+    def run(self):
+        # write pid to file
+        collector_id = os.getpid()
+        collector_file = os.path.join(os.getcwd(), 'collector_{}.sh'.format(collector_id))
+        with open(collector_file, 'w') as f:
+            f.write('kill -9 {}'.format(collector_id))
+
+        workspace_params = WorkspaceParams.load_from_file('params.pkl')
+        self.openrave_interface = OpenraveRLInterface(self.config, workspace_params)
+        self._run_main_loop()
 
 
 class ActorProcess(multiprocessing.Process):
@@ -43,19 +80,21 @@ class ActorProcess(multiprocessing.Process):
         joints = joints[1:]
         return joints, poses, jacobians
 
-    def _run_episode(self, sess, allowed_size, is_train):
+    def _run_episode(self, sess, query_params, is_train):
         # the trajectory data structures to return
+        start_episode_time = datetime.datetime.now()
         states = []
         actions = []
         rewards = []
-        # get a new query
+        # start the new query
         current_joints, goal_joints, workspace_image, steps_required_for_motion_plan = \
-            self.openrave_interface.start_new_random(allowed_size)
+            self.openrave_interface.start_specific(*query_params)
         goal_pose = self.openrave_interface.openrave_manager.get_target_pose(goal_joints)
         goal_joints = goal_joints[1:]
         # set the start state
         current_state = self._compute_state(current_joints)
         states.append(current_state)
+        start_rollout_time = datetime.datetime.now()
         # the result of the episode
         status = None
         # compute the maximal number of steps to execute
@@ -87,16 +126,19 @@ class ActorProcess(multiprocessing.Process):
         # return the trajectory along with query info
         assert len(states) == len(actions) + 1
         assert len(states) == len(rewards) + 1
-        return status, states, actions, rewards, goal_pose, goal_joints, workspace_image
+        end_episode_time = datetime.datetime.now()
+        find_trajectory_time = start_rollout_time - start_episode_time
+        rollout_time = end_episode_time-start_rollout_time
+        return status, states, actions, rewards, goal_pose, goal_joints, workspace_image, find_trajectory_time, rollout_time
 
     def _run_main_loop(self, sess):
         while True:
             try:
                 # wait 1 second for a trajectory request
                 next_episode_request = self.generate_episode_queue.get(block=True, timeout=1)
-                allowed_size = next_episode_request[0]
+                query_params = next_episode_request[0]
                 is_train = next_episode_request[1]
-                path = self._run_episode(sess, allowed_size, is_train)
+                path = self._run_episode(sess, query_params, is_train)
                 self.result_queue.put(path)
                 self.generate_episode_queue.task_done()
             except Queue.Empty:
@@ -150,18 +192,32 @@ class ActorProcess(multiprocessing.Process):
 class RolloutManager:
     def __init__(self, config):
         self.episode_generation_queue = multiprocessing.JoinableQueue()
-        self.results_queue = multiprocessing.Queue()
+        self.episode_results_queue = multiprocessing.Queue()
+        self.query_results_queue = multiprocessing.Queue()
+        self.collector_specific_queue = [
+            multiprocessing.JoinableQueue() for _ in range(config['general']['collector_processes'])
+        ]
         self.actor_specific_queues = [
             multiprocessing.JoinableQueue() for _ in range(config['general']['actor_processes'])
         ]
 
+        self.collectors = [
+            QueryCollectorProcess(
+                copy.deepcopy(config), self.query_results_queue, self.collector_specific_queue[i]
+            )
+            for i in range(config['general']['collector_processes'])
+        ]
         self.actors = [
             ActorProcess(
-                copy.deepcopy(config), self.episode_generation_queue, self.results_queue, self.actor_specific_queues[i]
+                copy.deepcopy(config), self.episode_generation_queue, self.episode_results_queue, self.actor_specific_queues[i]
             )
             for i in range(config['general']['actor_processes'])
         ]
-        # start all the processes
+        # start all the collector processes
+        for c in self. collectors:
+            c.start()
+
+        # start all the actor processes
         for a in self.actors:
             a.start()
         # for every actor process, post a message to initialize the actor network
@@ -169,11 +225,12 @@ class RolloutManager:
             actor_queue.put((0, ))
             actor_queue.join()
 
-    def generate_episodes(self, number_of_episodes, allowed_size, is_train):
-        # create a tuple that describes the episode generation request
-        message = (allowed_size, is_train)
-        # place in queue
+    def generate_episodes(self, number_of_episodes, is_train):
         for i in range(number_of_episodes):
+            # get a query
+            query = self.query_results_queue.get()
+            message = (query, is_train)
+            # place in queue
             self.episode_generation_queue.put(message)
 
         self.episode_generation_queue.join()
@@ -181,20 +238,21 @@ class RolloutManager:
         episodes = []
         while number_of_episodes:
             number_of_episodes -= 1
-            episodes.append(self.results_queue.get())
+            episodes.append(self.episode_results_queue.get())
 
         return episodes
 
     def set_policy_weights(self, weights):
         message = (2, weights)
-        self._post_private_message(message)
+        self._post_private_message(message, self.actor_specific_queues)
 
     def end(self):
         message = (1, )
-        self._post_private_message(message)
+        self._post_private_message(message, self.actor_specific_queues)
+        self._post_private_message(message, self.collector_specific_queue)
 
-    def _post_private_message(self, message):
-        for actor_queue in self.actor_specific_queues:
-            actor_queue.put(message)
-        for actor_queue in self.actor_specific_queues:
-            actor_queue.join()
+    def _post_private_message(self, message, queues):
+        for queue in queues:
+            queue.put(message)
+        for queue in queues:
+            queue.join()
