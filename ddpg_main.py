@@ -11,7 +11,6 @@ from hindsight_policy import HindsightPolicy
 from network import Network
 from replay_buffer import ReplayBuffer
 from rollout_manager import RolloutManager
-from saver_wrapper import SaverWrapper
 from summaries_collector import SummariesCollector
 from trajectory_eval import TrajectoryEval
 from workspace_generation_utils import *
@@ -32,6 +31,8 @@ def run_for_config(config, print_messages):
     # where we save all the outputs
     working_dir = os.getcwd()
     saver_dir = os.path.join(working_dir, 'models', model_name)
+    if not os.path.exists(saver_dir):
+        os.makedirs(saver_dir)
     config_copy_path = os.path.join(working_dir, 'models', model_name, 'config.yml')
     summaries_dir = os.path.join(working_dir, 'tensorboard', model_name)
     completed_trajectories_dir = os.path.join(working_dir, 'trajectories', model_name)
@@ -44,7 +45,7 @@ def run_for_config(config, print_messages):
     hindsight_policy = HindsightPolicy(config, replay_buffer)
 
     # save model
-    saver = SaverWrapper(saver_dir)
+    saver = tf.train.Saver(max_to_keep=4, save_relative_paths=saver_dir)
     yaml.dump(config, open(config_copy_path, 'w'))
     summaries_collector = SummariesCollector(summaries_dir, model_name)
     curriculum_manager = CurriculumManager(config, print_messages)
@@ -222,6 +223,9 @@ def run_for_config(config, print_messages):
                 )
                 summaries_collector.write_test_curriculum_summaries(sess, global_step, allowed_size)
                 test_results.append((global_step, episodes, test_successful_episodes, allowed_size))
+
+            if update_index % config['general']['save_model_every_cycles'] == 0:
+                saver.save(sess, os.path.join(saver_dir, 'all_graph'), global_step=global_step)
     rollout_manager.end()
     return test_results
 
