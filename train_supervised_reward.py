@@ -15,7 +15,7 @@ from potential_point import PotentialPoint
 model_name = datetime.datetime.fromtimestamp(time.time()).strftime('%Y_%m_%d_%H_%M_%S')
 
 # read the config
-config_path = os.path.join(os.getcwd(), 'config/reward_config_v2.yml')
+config_path = os.path.join(os.getcwd(), 'config/reward_config.yml')
 with open(config_path, 'r') as yml_file:
     config = yaml.load(yml_file)
     print('------------ Config ------------')
