@@ -1,10 +1,11 @@
 import yaml
 
-from backup_scripts.pre_trained_reward import *
+from pre_trained_reward import *
 
 if __name__ == '__main__':
     # model_name = '2018_10_26_15_00_56'
-    model_name = '2018_10_29_16_14_37'
+    # model_name = '2018_10_29_16_14_37'
+    model_name = '2018_10_31_10_44_31'
 
     # read the config
     config_path = os.path.join(os.getcwd(), 'config/reward_config.yml')

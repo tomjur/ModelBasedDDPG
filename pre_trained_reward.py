@@ -129,43 +129,6 @@ def oversample_batch(data_collection, data_index, batch_size, oversample_large_m
     return [current_batch[i] for i in batch_indices]
 
 
-# def oversample_batch(data_collection, data_index, batch_size, oversample_large_magnitude=False):
-#     current_batch = data_collection[data_index:data_index + batch_size]
-#     if not oversample_large_magnitude:
-#         return current_batch
-#     rewards = [b[5] for b in current_batch]
-#     success_reward_indices = [i for i, r in enumerate(rewards) if r > 0.8]
-#     if len(success_reward_indices) == 0:
-#         return None
-#     collision_reward_indices = [i for i, r in enumerate(rewards) if r < -0.8]
-#     if len(collision_reward_indices) == 0:
-#         return None
-#     other_reward_indices = [i for i, r in enumerate(rewards) if np.abs(r) <= 0.8]
-#     assert len(success_reward_indices) + len(collision_reward_indices) + len(other_reward_indices) == len(current_batch)
-#     batch_indices = other_reward_indices
-#     success_super_sample = list(np.random.choice(success_reward_indices, len(other_reward_indices)))
-#     batch_indices.extend(success_super_sample)
-#     collision_super_sample = list(np.random.choice(collision_reward_indices, len(other_reward_indices)))
-#     batch_indices.extend(collision_super_sample)
-#     return [current_batch[i] for i in batch_indices]
-
-
-# def oversample_batch(data_collection, data_index, batch_size, oversample_large_magnitude=False):
-#     current_batch = data_collection[data_index:data_index + batch_size]
-#     if not oversample_large_magnitude:
-#         return current_batch
-#     rewards = [b[5] for b in current_batch]
-#     large_reward_indices = [i for i, r in enumerate(rewards) if np.abs(r) > 0.8]
-#     if len(large_reward_indices) == 0:
-#         return None
-#     small_reward_indices = [i for i, r in enumerate(rewards) if np.abs(r) <= 0.8]
-#     assert len(large_reward_indices) + len(small_reward_indices) == len(current_batch)
-#     batch_indices = small_reward_indices
-#     large_reward_super_sample = list(np.random.choice(large_reward_indices, len(small_reward_indices)))
-#     batch_indices.extend(large_reward_super_sample)
-#     return [current_batch[i] for i in batch_indices]
-
-
 def get_batch_and_labels(batch, openrave_manager):
     all_start_joints = []
     all_goal_joints = []
@@ -184,28 +147,6 @@ def get_batch_and_labels(batch, openrave_manager):
         all_goal_poses.append(goal_pose)
     return [all_start_joints, all_goal_joints, all_actions, all_goal_poses], all_rewards, all_status
 
-
-# def compute_absolute_error_single_class(rewards, predictions, predicate):
-#     class_indices = [i for i, r in enumerate(rewards) if predicate(r)]
-#     if len(class_indices) == 0:
-#         class_average_absolute_error = 0.0
-#         class_max_absolute_error = 0.0
-#     else:
-#         difference = [np.abs(rewards[i] - predictions[i]) for i in class_indices]
-#         class_average_absolute_error = np.mean(difference)
-#         class_max_absolute_error = np.max(difference)
-#     return class_indices, [class_average_absolute_error, class_max_absolute_error]
-#
-#
-# def compute_absolute_error_per_class(rewards, predictions):
-#     goal_rewards_indices, goal_rewards_error = compute_absolute_error_single_class(
-#         rewards, predictions, lambda r: r > 0.8)
-#     collision_rewards_indices, collision_rewards_error = compute_absolute_error_single_class(
-#         rewards, predictions, lambda r: r < -0.8)
-#     other_rewards_indices, other_rewards_error = compute_absolute_error_single_class(
-#         rewards, predictions, lambda r: -0.8 <= r <= 0.8)
-#     assert len(goal_rewards_indices) + len(collision_rewards_indices) + len(other_rewards_indices) == len(rewards)
-#     return goal_rewards_error, collision_rewards_error, other_rewards_error
 
 def compute_stats_single_class(real_status, real_reward, status_prediction, reward_prediction, class_indicator):
     class_indices = [i for i, s in enumerate(real_status) if s == class_indicator]
@@ -264,31 +205,29 @@ def print_model_stats(pre_trained_reward_network, test_batch_size, sess):
 
     # run test for one (random) batch
     random.shuffle(test)
-    # test_batch = oversample_batch(test, 0, test_batch_size, True)
     test_batch = oversample_batch(test, 0, test_batch_size)
-    test_batch, test_rewards = get_batch_and_labels(test_batch, openrave_manager)
-    prediction = pre_trained_reward_network.make_prediction(*([sess] + test_batch))
+    test_batch, test_rewards, test_status = get_batch_and_labels(test_batch, openrave_manager)
+    reward_prediction, status_prediction = pre_trained_reward_network.make_prediction(*([sess] + test_batch))
     # see what happens for different reward classes:
-    goal_rewards_error, collision_rewards_error, other_rewards_error = compute_absolute_error_per_class(
-        test_rewards, prediction)
+    goal_rewards_stats, collision_rewards_stats, other_rewards_stats = compute_stats_per_class(
+        test_status, test_rewards, status_prediction, reward_prediction)
     print 'before loading weights'
-    print 'goal_rewards_error {}'.format(goal_rewards_error)
-    print 'collision_rewards_error {}'.format(collision_rewards_error)
-    print 'other_rewards_error {}'.format(other_rewards_error)
+    print 'goal mean_error {} max_error {} accuracy {}'.format(*goal_rewards_stats)
+    print 'collision mean_error {} max_error {} accuracy {}'.format(*collision_rewards_stats)
+    print 'other mean_error {} max_error {} accuracy {}'.format(*other_rewards_stats)
 
     # load weights
     pre_trained_reward_network.load_weights(sess)
-
     # run test for one (random) batch
     random.shuffle(test)
-    # test_batch = oversample_batch(test, 0, test_batch_size, True)
+
     test_batch = oversample_batch(test, 0, test_batch_size)
-    test_batch, test_rewards = get_batch_and_labels(test_batch, openrave_manager)
-    prediction = pre_trained_reward_network.make_prediction(*([sess] + test_batch))
+    test_batch, test_rewards, test_status = get_batch_and_labels(test_batch, openrave_manager)
+    reward_prediction, status_prediction = pre_trained_reward_network.make_prediction(*([sess] + test_batch))
     # see what happens for different reward classes:
-    goal_rewards_error, collision_rewards_error, other_rewards_error = compute_absolute_error_per_class(
-        test_rewards, prediction)
+    goal_rewards_stats, collision_rewards_stats, other_rewards_stats = compute_stats_per_class(
+        test_status, test_rewards, status_prediction, reward_prediction)
     print 'after loading weights'
-    print 'goal_rewards_error {}'.format(goal_rewards_error)
-    print 'collision_rewards_error {}'.format(collision_rewards_error)
-    print 'other_rewards_error {}'.format(other_rewards_error)
+    print 'goal mean_error {} max_error {} accuracy {}'.format(*goal_rewards_stats)
+    print 'collision mean_error {} max_error {} accuracy {}'.format(*collision_rewards_stats)
+    print 'other mean_error {} max_error {} accuracy {}'.format(*other_rewards_stats)
