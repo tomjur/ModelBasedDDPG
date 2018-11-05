@@ -13,6 +13,8 @@ from potential_point import PotentialPoint
 class PreTrainedReward:
 
     def __init__(self, model_name, config):
+        self._reuse_flag = False
+
         self.config = config
         self.joints_inputs = tf.placeholder(tf.float32, (None, 4), name='joints_inputs')
         self.goal_joints_inputs = tf.placeholder(tf.float32, (None, 4), name='goal_joints_inputs')
@@ -22,7 +24,10 @@ class PreTrainedReward:
             self.goal_pose_inputs = tf.placeholder(tf.float32, (None, 2), name='goal_pose_inputs')
         self.action_inputs = tf.placeholder(tf.float32, (None, 4), name='action_inputs')
         current_variables_count = len(tf.trainable_variables())
-        self.reward_prediction, self.status_softmax_logits = self._create_reward_network()
+        self.reward_prediction, self.status_softmax_logits = self.create_reward_network(
+            self.joints_inputs, self.action_inputs, self.goal_joints_inputs, self.goal_pose_inputs,
+            self.workspace_image_inputs
+        )
         reward_variables = tf.trainable_variables()[current_variables_count:]
 
         # model path to load
@@ -31,17 +36,18 @@ class PreTrainedReward:
         assert os.path.exists(self.saver_dir)
         self.saver = tf.train.Saver(reward_variables, max_to_keep=4, save_relative_paths=self.saver_dir)
 
-    def _generate_goal_features(self):
-        features = [self.goal_joints_inputs]
-        if self.goal_pose_inputs is not None:
-            features.append(self.goal_pose_inputs)
+    @staticmethod
+    def _generate_goal_features(goal_joints_inputs, goal_pose_inputs, workspace_image_inputs):
+        features = [goal_joints_inputs]
+        if goal_pose_inputs is not None:
+            features.append(goal_pose_inputs)
         return tf.concat(features, axis=1)
 
-    def _next_state_model(self):
+    def _next_state_model(self, joints_inputs, action_inputs):
         # next step is a deterministic computation
         action_step_size = self.config['openrave_rl']['action_step_size']
-        step = self.action_inputs * action_step_size
-        unclipped_result = self.joints_inputs + step
+        step = action_inputs * action_step_size
+        unclipped_result = joints_inputs + step
         # we initiate an openrave manager to get the robot, to get the joint bounds and the safety
         joint_safety = 0.0001
         lower_bounds = [-2.617, -1.571, -1.571, -1.745, -2.617]
@@ -53,20 +59,21 @@ class PreTrainedReward:
         clipped_result = tf.minimum(clipped_result, upper_bounds)
         return clipped_result, unclipped_result
 
-    def _create_reward_network(self):
+    def create_reward_network(
+            self, joints_inputs, action_inputs, goal_joints_inputs, goal_pose_inputs, workspace_image_inputs):
         name_prefix = 'reward'
         # get the next joints
-        clipped_next_joints, unclipped_next_joints = self._next_state_model()
+        clipped_next_joints, unclipped_next_joints = self._next_state_model(joints_inputs, action_inputs)
 
         # predict the transition classification
         layers = self.config['reward']['layers'] + [3]
         scale = self.config['reward']['l2_regularization_coefficient']
-        current = tf.concat((clipped_next_joints, self._generate_goal_features()), axis=1)
+        current = tf.concat((clipped_next_joints, self._generate_goal_features(goal_joints_inputs, goal_pose_inputs, workspace_image_inputs)), axis=1)
         for i, layer_size in enumerate(layers):
             _activation = None if i == len(layers) - 1 else get_activation(self.config['reward']['activation'])
             current = tf.layers.dense(
                 current, layer_size, activation=_activation, name='{}_layers_{}'.format(name_prefix, i),
-                kernel_regularizer=tf_layers.l2_regularizer(scale)
+                kernel_regularizer=tf_layers.l2_regularizer(scale), reuse=self._reuse_flag
             )
         softmax_logits = current
         softmax_res = tf.nn.softmax(softmax_logits)
@@ -74,6 +81,7 @@ class PreTrainedReward:
         # get the classification reward
         classification_reward = tf.layers.dense(
                 softmax_res, 1, activation=None, use_bias=False, name='{}_classification_reward'.format(name_prefix),
+                reuse=self._reuse_flag
             )
 
         # get the clipping-related reward
@@ -81,10 +89,12 @@ class PreTrainedReward:
                 tf.reduce_sum(tf.square(unclipped_next_joints - clipped_next_joints), axis=1)
             ), axis=1)
         clipping_reward = tf.layers.dense(
-            clipped_difference, 1, activation=None, use_bias=False, name='{}_clipping_weight'.format(name_prefix)
+            clipped_difference, 1, activation=None, use_bias=False, name='{}_clipping_weight'.format(name_prefix),
+            reuse=self._reuse_flag
         )
 
         total_reward = classification_reward + clipping_reward
+        self._reuse_flag = True
         return total_reward, softmax_logits
 
     def load_weights(self, sess):
