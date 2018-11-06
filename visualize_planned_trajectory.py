@@ -13,13 +13,13 @@ from openravepy import *
 from potential_point import PotentialPoint
 from workspace_generation_utils import WorkspaceParams
 
-trajectories_dir = os.path.abspath(os.path.expanduser('/home/tom/OpenraveDDPG/trajectories'))
-model_name = '2018_10_08_09_10_59'
-global_step = '30040'
-path_id = '11'
-# message = 'max_len'
+trajectories_dir = os.path.abspath(os.path.expanduser('/home/tom/ModelBasedDDPG/trajectories'))
+model_name = '2018_11_05_11_41_15'
+global_step = '36040'
+path_id = '0'
+message = 'max_len'
 # message = 'collision'
-message = 'success'
+# message = 'success'
 # workspace_params_path = None
 workspace_params_path = 'params.pkl'
 speed = 10.0
