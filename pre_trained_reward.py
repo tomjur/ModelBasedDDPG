@@ -85,9 +85,10 @@ class PreTrainedReward:
             )
 
         # get the clipping-related reward
-        clipped_difference = tf.expand_dims(tf.sqrt(
-                tf.reduce_sum(tf.square(unclipped_next_joints - clipped_next_joints), axis=1)
-            ), axis=1)
+        # clipped_difference = tf.expand_dims(tf.norm(unclipped_next_joints - clipped_next_joints, axis=1), axis=1)  # this is the original
+        # clipped_difference = tf.expand_dims(tf.reduce_sum(tf.zeros_like(clipped_next_joints), axis=1), axis=1)  # this will have no gradient backlash
+        clipped_difference = tf.expand_dims(tf.reduce_sum(tf.abs(unclipped_next_joints - clipped_next_joints), axis=1), axis=1)
+
         clipping_reward = tf.layers.dense(
             clipped_difference, 1, activation=None, use_bias=False, name='{}_clipping_weight'.format(name_prefix),
             reuse=self._reuse_flag

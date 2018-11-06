@@ -13,6 +13,7 @@ from replay_buffer import ReplayBuffer
 from rollout_manager import RolloutManager
 from summaries_collector import SummariesCollector
 from trajectory_eval import TrajectoryEval
+from pre_trained_reward import PreTrainedReward
 from workspace_generation_utils import *
 
 
@@ -37,8 +38,17 @@ def run_for_config(config, print_messages):
     summaries_dir = os.path.join(working_dir, 'tensorboard', model_name)
     completed_trajectories_dir = os.path.join(working_dir, 'trajectories', model_name)
 
+    alter_episode_mode = 0  # natural reward and original episode
+    # alter_episode_mode = 1  # use learned reward with episode truncation
+    # alter_episode_mode = 2  # use learned reward without episode truncation
+
+    # load pretrained model if required
+    pre_trained_reward = None
+    if alter_episode_mode > 0 or config['model']['use_reward_model']:
+        pre_trained_reward = PreTrainedReward('2018_10_31_10_44_31', config)
+
     # generate graph:
-    network = Network(config, is_rollout_agent=False)
+    network = Network(config, is_rollout_agent=False, pre_trained_reward=pre_trained_reward)
 
     # initialize replay memory
     replay_buffer = ReplayBuffer(config)
@@ -89,26 +99,13 @@ def run_for_config(config, print_messages):
         if min_label < -limit:
             print 'out of range min label: {} limit: {}'.format(min_label, limit)
 
+        # # step to use for debug:
+        # network.debug_all(current_joints, workspace_image, goal_pose, goal_joints, action, q_label, sess)
+
         # train critic given the targets
         critic_optimization_summaries, _ = network.train_critic(
             current_joints, workspace_image, goal_pose, goal_joints, action, q_label, sess
         )
-
-        reward_optimization_summaries = None
-        if config['model']['use_reward_model']:
-            # train reward if needed
-            reward_input = np.expand_dims(np.array(reward), axis=1)
-            reward_optimization_summaries, _ = network.train_reward(
-                current_joints, workspace_image, goal_pose, goal_joints, action, reward_input, sess
-            )
-
-        termination_optimization_summaries = None
-        if config['model']['use_reward_model']:
-            # train termination if needed
-            termination_input = np.expand_dims(np.array(terminated, dtype=np.float32), axis=1)
-            termination_optimization_summaries, _ = network.train_termination(
-                next_joints, workspace_image, goal_pose, goal_joints, termination_input, sess
-            )
 
         # train actor
         actor_optimization_summaries, _ = network.train_actor(
@@ -118,12 +115,37 @@ def run_for_config(config, print_messages):
         # update target networks
         network.update_target_networks(sess)
 
-        result = [
-            critic_optimization_summaries, actor_optimization_summaries, reward_optimization_summaries,
-            termination_optimization_summaries
-        ]
-
+        result = [critic_optimization_summaries, actor_optimization_summaries, ]
         return result
+
+    def alter_episode(status, states, actions, rewards, goal_pose, goal_joints, workspace_image, find_trajectory_time,
+                      rollout_time):
+        if alter_episode_mode == 0:
+            return status, states, actions, rewards, goal_pose, goal_joints, workspace_image, find_trajectory_time, \
+                   rollout_time
+        # first unpack states:
+        joints, poses, jacobians = unpack_state_batch(states)
+        current_joints = joints[:len(joints)-1]
+        #  make a prediction
+        fake_rewards, fake_status_prob = pre_trained_reward.make_prediction(sess, current_joints, [goal_joints]*len(actions), actions, [goal_pose]*len(actions))
+        if alter_episode_mode == 2:
+            # change the rewards but keep episode the same
+            return status, states, actions, [r[0] for r in fake_rewards], goal_pose, goal_joints, workspace_image, \
+                   find_trajectory_time, rollout_time
+
+        # get the maximal status for each transition (the indices are from 0-2 while the status are 1-3)
+        fake_status = np.argmax(np.array(fake_status_prob), axis=1)
+        fake_status += 1
+        # iterate over approximated episode and see if truncation is needed
+        truncation_index = 0
+        for truncation_index in range(len(fake_status)):
+            if fake_status[truncation_index] != 1:
+                break
+        # return the status of the last transition, truncated list of states and actions, the fake rewards (also
+        # truncated) and the goal parameters as-is.
+        return fake_status[truncation_index], states[:truncation_index+2], actions[:truncation_index+1], \
+               [r[0] for r in fake_rewards[:truncation_index+1]], goal_pose, goal_joints, workspace_image, \
+               find_trajectory_time, rollout_time
 
     def print_state(prefix, episodes, successful_episodes, collision_episodes, max_len_episodes):
         if not print_messages:
@@ -140,6 +162,8 @@ def run_for_config(config, print_messages):
             )
     ) as sess:
         sess.run(tf.global_variables_initializer())
+        if pre_trained_reward is not None:
+            pre_trained_reward.load_weights(sess)
         network.update_target_networks(sess)
 
         trajectory_eval = TrajectoryEval(config, rollout_manager, completed_trajectories_dir)
@@ -163,7 +187,7 @@ def run_for_config(config, print_messages):
             total_rollout_time = None
             for episode_result in episode_results:
                 # run episode:
-                status, states, actions, rewards, goal_pose, goal_joints, workspace_image, find_trajectory_time, rollout_time = episode_result
+                status, states, actions, rewards, goal_pose, goal_joints, workspace_image, find_trajectory_time, rollout_time = alter_episode(*episode_result)
                 if total_find_trajectory_time is None:
                     total_find_trajectory_time = find_trajectory_time
                 else:

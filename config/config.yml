@@ -1,6 +1,8 @@
 general:
   name:
-  random_seed: 123
+#  random_seed: 123
+#  random_seed: 456
+  random_seed: 789
   updates_cycle_count: 10000
   episodes_per_update: 16
   model_updates_per_cycle: 40
@@ -12,6 +14,7 @@ general:
   collector_processes: 4
 #  actor_processes: 1
   write_train_summaries: 500
+  save_model_every_cycles: 100
 
 openrave_rl:
   action_step_size: 0.025
@@ -87,7 +90,7 @@ critic:
 #  layers_after_action: [64, 64]
   activation: 'elu'
 #  l2_regularization_coefficient: 0.0
-  l2_regularization_coefficient: 0.0001
+  l2_regularization_coefficient: 0.000001
 
 reward:
   learning_rate: 0.001
@@ -98,14 +101,8 @@ reward:
 #  layers_after_action: [20, 20, 20]
   activation: 'elu'
   layers: [50, 50, 50]
-  l2_regularization_coefficient: 0.0001
+  l2_regularization_coefficient: 0.0
 
-termination:
-  learning_rate: 0.001
-#  learning_rate: 0.0001
-#  gradient_limit: 10.0
-  gradient_limit: 0.0
-  layers: [50, 50]
-  activation: 'elu'
+
 
 

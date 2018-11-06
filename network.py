@@ -1,3 +1,4 @@
+import numpy as np
 import os
 import tensorflow as tf
 import tensorflow.contrib.layers as layers
@@ -8,7 +9,8 @@ from potential_point import PotentialPoint
 
 
 class Network(object):
-    def __init__(self, config, is_rollout_agent, image_shape=(445, 222, 3), number_of_joints=4, pose_dimensions=2):
+    def __init__(self, config, is_rollout_agent, image_shape=(445, 222, 3), number_of_joints=4, pose_dimensions=2,
+                 pre_trained_reward=None):
         self.config = config
         tau = self.config['model']['tau']
         gamma = self.config['model']['gamma']
@@ -52,15 +54,15 @@ class Network(object):
             return
 
         use_reward_model = self.config['model']['use_reward_model']
-        forward_model_next_state, forward_model_action, forward_model_tanh = None, None, None
+        self.forward_model_next_state, self.forward_model_action, forward_model_tanh = None, None, None
         if use_reward_model:
             # deterministic value of the next state (from current state, executing the online action)
-            forward_model_next_state = self._next_state_model() if use_reward_model else None
+            self.forward_model_next_state = self._next_state_model() if use_reward_model else None
 
             # online actor network for the result of the forward model
             variable_count = len(tf.trainable_variables())
-            actor_results = self._create_actor_network(forward_model_next_state, is_online=True, reuse_flag=True)
-            forward_model_action = actor_results[0]
+            actor_results = self._create_actor_network(self.forward_model_next_state, is_online=True, reuse_flag=True)
+            self.forward_model_action = actor_results[0]
             forward_model_tanh = actor_results[1]
             assert variable_count == len(tf.trainable_variables())  # make sure no new parameters were added
 
@@ -89,11 +91,11 @@ class Network(object):
         # online critic for predicting the q value for actor update.
         # if using a reward model, the joint inputs are given by the forward model and so are the actions.
         # if in regular ddpg, the joints inputs are given by the current state inputs, the actions are the policy on
-        # these jonts.
+        # these joints.
         variable_count = len(tf.trainable_variables())
         self.online_q_value_under_policy = self._create_critic_network(
-            joints_input=forward_model_next_state if use_reward_model else self.joints_inputs,
-            action_input=forward_model_action if use_reward_model else self.online_action,
+            joints_input=self.forward_model_next_state if use_reward_model else self.joints_inputs,
+            action_input=self.forward_model_action if use_reward_model else self.online_action,
             is_online=True, reuse_flag=True, add_regularization_loss=False
         )
         assert variable_count == len(tf.trainable_variables())  # make sure no new parameters were added
@@ -111,69 +113,28 @@ class Network(object):
                 tf.multiply(online_critic_params[i], tau) + tf.multiply(target_critic_params[i], 1. - tau)
             ) for i in range(len(target_critic_params))]
 
-        self.fixed_action_reward, self.online_action_reward, reward_params = None, None, None
+        self.fixed_action_reward, self.fixed_action_termination, self.online_action_reward, self.online_action_termination = None, None, None, None
         if use_reward_model:
+            assert pre_trained_reward is not None
+            variable_count = len(tf.trainable_variables())
             # reward network to predict the immediate reward of a given action
-            variable_count = len(tf.trainable_variables())
-            self.fixed_action_reward = self._create_reward_network(
-                self.joints_inputs, self.action_inputs, reuse_flag=False)
-            reward_params = tf.trainable_variables()[variable_count:]
+            self.fixed_action_reward, fixed_action_status = pre_trained_reward.create_reward_network(
+                self.joints_inputs, self.action_inputs, self.goal_joints_inputs, self.goal_pose_inputs,
+                self.workspace_image_inputs
+            )
+            self.fixed_action_termination = self._compute_termination_from_status(fixed_action_status)
             # reward network to predict the immediate reward of the online policy action
-            variable_count = len(tf.trainable_variables())
-            self.online_action_reward = self._create_reward_network(
-                self.joints_inputs, self.online_action, reuse_flag=True)
+            self.online_action_reward, online_action_status = pre_trained_reward.create_reward_network(
+                self.joints_inputs, self.online_action, self.goal_joints_inputs, self.goal_pose_inputs,
+                self.workspace_image_inputs
+            )
+            self.online_action_termination = self._compute_termination_from_status(online_action_status)
             assert variable_count == len(tf.trainable_variables())
 
-        self.fixed_action_termination, self.online_action_termination, termination_params = None, None, None
-        if use_reward_model:
-            # reward network to predict the immediate reward of a given action
-            variable_count = len(tf.trainable_variables())
-            self.fixed_action_termination = self._create_termination_network(
-                self.joints_inputs, reuse_flag=False)
-            termination_params = tf.trainable_variables()[variable_count:]
-            # reward network to predict the immediate reward of the online policy action
-            variable_count = len(tf.trainable_variables())
-            self.online_action_termination = self._create_termination_network(
-                forward_model_next_state, reuse_flag=True)
-            assert variable_count == len(tf.trainable_variables())
-
-        # the label to use to train the online critic network or reward network or termination network
+        # the label to use to train the online critic network
         self.scalar_label = tf.placeholder(tf.float32, [None, 1])
 
         batch_size = tf.cast(tf.shape(self.joints_inputs)[0], tf.float32)
-
-        self.optimize_reward, self.reward_optimization_summaries = None, None
-        if use_reward_model:
-            # reward network optimization
-            reward_loss = tf.div(tf.losses.mean_squared_error(self.scalar_label, self.fixed_action_reward), batch_size)
-            reward_initial_gradients_norm, reward_clipped_gradients_norm, self.optimize_reward = self._optimize_by_loss(
-                reward_loss, reward_params, self.config['reward']['learning_rate'],
-                self.config['reward']['gradient_limit']
-            )
-            # summaries for the reward optimization
-            self.reward_optimization_summaries = tf.summary.merge([
-                tf.summary.scalar('reward_loss', reward_loss),
-                tf.summary.scalar('reward_gradients_norm_initial', reward_initial_gradients_norm),
-                tf.summary.scalar('reward_gradients_norm_clipped', reward_clipped_gradients_norm),
-            ])
-
-        self.optimize_termination, self.termination_optimization_summaries = None, None
-        if use_reward_model:
-            # termination network optimization
-            termination_loss = tf.div(tf.losses.mean_squared_error(
-                self.scalar_label, self.fixed_action_termination), batch_size
-            )
-            termination_initial_gradients_norm, termination_clipped_gradients_norm, self.optimize_termination = \
-                self._optimize_by_loss(
-                    termination_loss, termination_params, self.config['termination']['learning_rate'],
-                    self.config['termination']['gradient_limit']
-                )
-            # summaries for the termination optimization
-            self.termination_optimization_summaries = tf.summary.merge([
-                tf.summary.scalar('termination_loss', termination_loss),
-                tf.summary.scalar('termination_gradients_norm_initial', termination_initial_gradients_norm),
-                tf.summary.scalar('termination_gradients_norm_clipped', termination_clipped_gradients_norm),
-            ])
 
         # critic optimization
         critic_prediction_loss = tf.div(
@@ -181,33 +142,36 @@ class Network(object):
         critic_regularization = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
         critic_regularization_loss = tf.div(tf.add_n(critic_regularization), batch_size) \
             if len(critic_regularization) > 0 else 0.0
-        critic_total_loss = critic_prediction_loss + critic_regularization_loss
+        self.critic_total_loss = critic_prediction_loss + critic_regularization_loss
 
-        critic_initial_gradients_norm, critic_clipped_gradients_norm, self.optimize_critic = self._optimize_by_loss(
-            critic_total_loss, online_critic_params, self.config['critic']['learning_rate'],
-            self.config['critic']['gradient_limit']
-        )
+        self.critic_initial_gradients_norm, self.critic_clipped_gradients_norm, self.optimize_critic = \
+            self._optimize_by_loss(
+                self.critic_total_loss, online_critic_params, self.config['critic']['learning_rate'],
+                self.config['critic']['gradient_limit']
+            )
 
         # summaries for the critic optimization
         self.critic_optimization_summaries = tf.summary.merge([
             tf.summary.scalar('critic_prediction_loss', critic_prediction_loss),
             tf.summary.scalar('critic_regularization_loss', critic_regularization_loss),
-            tf.summary.scalar('critic_total_loss', critic_total_loss),
-            tf.summary.scalar('critic_gradients_norm_initial', critic_initial_gradients_norm),
-            tf.summary.scalar('critic_gradients_norm_clipped', critic_clipped_gradients_norm),
+            tf.summary.scalar('critic_total_loss', self.critic_total_loss),
+            tf.summary.scalar('critic_gradients_norm_initial', self.critic_initial_gradients_norm),
+            tf.summary.scalar('critic_gradients_norm_clipped', self.critic_clipped_gradients_norm),
         ])
 
         # when training the actor we derive the advantage w.r.t mu's network params (mu is the online policy)
         if use_reward_model:
             # advantage is r(s, mu(s)) + \gamma * q(f(s, mu(s)), mu(f(s, mu(s))))
             include_next_state = (1.0 - self.online_action_termination)
-            actor_loss = -tf.squeeze(
+            # include_next_state = 1.0
+            self.actor_loss = -(
                 self.online_action_reward + gamma * self.online_q_value_under_policy * include_next_state
                 # this is actually the policy on the forward model output
             )
         else:
             # advantage is q(s, mu(s))
-            actor_loss = -tf.squeeze(self.online_q_value_under_policy)
+            self.actor_loss = -self.online_q_value_under_policy
+        self.actor_loss = tf.reduce_sum(self.actor_loss)
         # if we have extra losses for the actor:
         tanh_loss_summary = None
         if self.config['action_predictor']['tanh_preactivation_loss_coefficient'] > 0.0:
@@ -220,25 +184,36 @@ class Network(object):
                 )
                 tanh_preactivation_loss += forward_model_tanh_preactivation_loss
             tanh_preactivation_loss *= self.config['action_predictor']['tanh_preactivation_loss_coefficient']
-            actor_loss += tanh_preactivation_loss
+            self.actor_loss += tanh_preactivation_loss
             tanh_loss_summary = tf.summary.scalar('tanh_preactivation_loss', tanh_preactivation_loss)
 
         # divide by the batch size
-        actor_loss = tf.div(actor_loss, batch_size)
+        self.actor_loss = tf.div(self.actor_loss, batch_size)
 
-        actor_initial_gradients_norm, actor_clipped_gradients_norm, self.optimize_actor = self._optimize_by_loss(
-            actor_loss, self.online_actor_params, self.config['actor']['learning_rate'],
-            self.config['actor']['gradient_limit']
-        )
+        self.actor_initial_gradients_norm, self.actor_clipped_gradients_norm, self.optimize_actor = \
+            self._optimize_by_loss(
+                self.actor_loss, self.online_actor_params, self.config['actor']['learning_rate'],
+                self.config['actor']['gradient_limit']
+            )
 
         # summaries for the optimization
         merge_list = [
-            tf.summary.scalar('actor_gradients_norm_initial', actor_initial_gradients_norm),
-            tf.summary.scalar('actor_gradients_norm_clipped', actor_clipped_gradients_norm),
+            tf.summary.scalar('actor_gradients_norm_initial', self.actor_initial_gradients_norm),
+            tf.summary.scalar('actor_gradients_norm_clipped', self.actor_clipped_gradients_norm),
+            tf.summary.scalar('actor_total_loss', self.actor_loss),
         ]
         if tanh_loss_summary is not None:
             merge_list.append(tanh_loss_summary)
         self.actor_optimization_summaries = tf.summary.merge(merge_list)
+
+    @staticmethod
+    def _compute_termination_from_status(status_logits):
+        free_space_logits, collision_logits, goal_logits = tf.split(status_logits, 3, axis=1)
+        should_stop_logits = tf.maximum(collision_logits, goal_logits)
+        softmax_logits = tf.concat((free_space_logits, should_stop_logits), axis=1)
+        softmax_output = tf.nn.softmax(softmax_logits, axis=1)
+        termination_probability = tf.split(softmax_output, 2, axis=1)[1]
+        return termination_probability
 
     @staticmethod
     def _optimize_by_loss(loss, parameters_to_optimize, learning_rate, gradient_limit):
@@ -331,40 +306,6 @@ class Network(object):
             )
         return current
 
-    def _create_reward_network(self, joints_input, action_input, reuse_flag):
-        name_prefix = '{}_reward'.format(os.getpid())
-        layers_before_action = self.config['reward']['layers_before_action']
-        layers_after_action = self.config['reward']['layers_after_action'] + [1]
-        activation = get_activation(self.config['reward']['activation'])
-
-        current = self._generate_policy_features(joints_input)
-        for i, layer_size in enumerate(layers_before_action):
-            current = tf.layers.dense(
-                current, layer_size, activation=activation, name='{}_before_action_{}'.format(name_prefix, i),
-                reuse=reuse_flag
-            )
-        current = tf.concat((current, action_input), axis=1)
-        for i, layer_size in enumerate(layers_after_action):
-            _activation = None if i == len(layers_after_action) - 1 else activation
-            current = tf.layers.dense(
-                current, layer_size, activation=_activation, name='{}_after_action_{}'.format(name_prefix, i),
-                reuse=reuse_flag
-            )
-        return current
-
-    def _create_termination_network(self, joints_input, reuse_flag):
-        name_prefix = '{}_termination'.format(os.getpid())
-        layers = self.config['termination']['layers'] + [1]
-        activation = get_activation(self.config['termination']['activation'])
-        current = self._generate_policy_features(joints_input)
-        for i, layer_size in enumerate(layers):
-            _activation = tf.nn.sigmoid if i == len(layers) - 1 else activation
-            current = tf.layers.dense(
-                current, layer_size, activation=_activation, name='{}_{}'.format(name_prefix, i),
-                reuse=reuse_flag
-            )
-        return current
-
     def train_critic(
             self, joint_inputs, workspace_image_inputs, goal_pose_inputs, goal_joints_inputs, action_inputs, q_label,
             sess
@@ -373,30 +314,8 @@ class Network(object):
             joint_inputs, workspace_image_inputs, goal_pose_inputs, goal_joints_inputs, action_inputs
         )
         feed_dictionary[self.scalar_label] = q_label
-        return sess.run([self.critic_optimization_summaries, self.optimize_critic], feed_dictionary)
-
-    def train_reward(
-            self, joint_inputs, workspace_image_inputs, goal_pose_inputs, goal_joints_inputs, action_inputs,
-            observed_reward, sess
-    ):
-        if self.optimize_reward is None:
-            return None, None
-        feed_dictionary = self._generate_feed_dictionary(
-            joint_inputs, workspace_image_inputs, goal_pose_inputs, goal_joints_inputs, action_inputs
-        )
-        feed_dictionary[self.scalar_label] = observed_reward
-        return sess.run([self.reward_optimization_summaries, self.optimize_reward], feed_dictionary)
-
-    def train_termination(
-            self, joint_inputs, workspace_image_inputs, goal_pose_inputs, goal_joints_inputs, observed_termination, sess
-    ):
-        if self.optimize_reward is None:
-            return None, None
-        feed_dictionary = self._generate_feed_dictionary(
-            joint_inputs, workspace_image_inputs, goal_pose_inputs, goal_joints_inputs
-        )
-        feed_dictionary[self.scalar_label] = observed_termination
-        return sess.run([self.termination_optimization_summaries, self.optimize_termination], feed_dictionary)
+        return sess.run(
+            [self.critic_optimization_summaries, self.optimize_critic], feed_dictionary)
 
     def train_actor(self, joint_inputs, workspace_image_inputs, goal_pose_inputs, goal_joints_inputs, sess):
         feed_dictionary = self._generate_feed_dictionary(
@@ -423,24 +342,6 @@ class Network(object):
         )
         return sess.run(self.online_q_value_fixed_action, feed_dictionary)
 
-    def predict_policy_reward(self, joint_inputs, workspace_image_inputs, goal_pose_inputs, goal_joints_inputs, sess):
-        if self.online_action_reward is None:
-            return None
-        feed_dictionary = self._generate_feed_dictionary(
-            joint_inputs, workspace_image_inputs, goal_pose_inputs, goal_joints_inputs
-        )
-        return sess.run(self.online_action_reward, feed_dictionary)
-
-    def predict_fixed_action_reward(
-            self, joint_inputs, workspace_image_inputs, goal_pose_inputs, goal_joints_inputs, action_inputs, sess
-    ):
-        if self.fixed_action_reward is None:
-            return None
-        feed_dictionary = self._generate_feed_dictionary(
-            joint_inputs, workspace_image_inputs, goal_pose_inputs, goal_joints_inputs, action_inputs
-        )
-        return sess.run(self.fixed_action_reward, feed_dictionary)
-
     def predict_action(
             self, joint_inputs, workspace_image_inputs, goal_pose_inputs, goal_joints_inputs, sess, use_online_network
     ):
@@ -461,6 +362,52 @@ class Network(object):
 
     def update_target_networks(self, sess):
         sess.run([self.update_critic_target_params, self.update_actor_target_params])
+
+    def _print(self, header, array):
+        print header
+        print 'is nan? {}'.format(np.isnan(array).any())
+        print 'max {}'.format(np.max(array))
+        print 'min {}'.format(np.min(array))
+        print ''
+
+    def debug_all(self, joint_inputs, workspace_image_inputs, goal_pose_inputs, goal_joints_inputs, action_inputs,
+                  q_label, sess):
+        use_reward_model = self.config['model']['use_reward_model']
+        feed_dictionary = self._generate_feed_dictionary(
+            joint_inputs, workspace_image_inputs, goal_pose_inputs, goal_joints_inputs, action_inputs
+        )
+        feed_dictionary[self.scalar_label] = q_label
+        ops = [
+            self.online_action, self.target_action, self.online_q_value_fixed_action, self.online_q_value_under_policy,
+            self.target_q_value_under_policy, self.critic_total_loss, self.critic_initial_gradients_norm,
+            self.critic_clipped_gradients_norm, self.actor_loss, self.actor_initial_gradients_norm,
+            self.actor_clipped_gradients_norm
+        ]
+        if use_reward_model:
+            ops += [
+                self.forward_model_next_state, self.forward_model_action, self.fixed_action_reward,
+                self.fixed_action_termination, self.online_action_reward, self.online_action_termination
+            ]
+        all_steps = sess.run(ops, feed_dictionary)
+        self._print('self.online_action', all_steps[0])
+        self._print('self.target_action', all_steps[1])
+        if use_reward_model:
+            self._print('self.forward_model_next_state', all_steps[11])
+            self._print('self.forward_model_action', all_steps[12])
+        self._print('self.online_q_value_fixed_action', all_steps[2])
+        self._print('self.online_q_value_under_policy', all_steps[3])
+        self._print('self.target_q_value_under_policy', all_steps[4])
+        if use_reward_model:
+            self._print('self.fixed_action_reward', all_steps[13])
+            self._print('self.fixed_action_termination', all_steps[14])
+            self._print('self.online_action_reward', all_steps[15])
+            self._print('self.online_action_termination', all_steps[16])
+        self._print('self.critic_total_loss', all_steps[5])
+        self._print('self.critic_initial_gradients_norm', all_steps[6])
+        self._print('self.critic_clipped_gradients_norm', all_steps[7])
+        self._print('self.actor_loss', all_steps[8])
+        self._print('self.actor_initial_gradients_norm', all_steps[9])
+        self._print('self.actor_clipped_gradients_norm', all_steps[10])
 
     def _generate_feed_dictionary(
             self, joints_inputs, workspace_image_inputs, goal_pose_inputs, goal_joints_inputs, action_inputs=None
