@@ -45,7 +45,7 @@ def run_for_config(config, print_messages):
     # load pretrained model if required
     pre_trained_reward = None
     if alter_episode_mode > 0 or config['model']['use_reward_model']:
-        pre_trained_reward = PreTrainedReward('2018_10_31_10_44_31', config)
+        pre_trained_reward = PreTrainedReward(config['model']['reward_model_name'], config)
 
     # generate graph:
     network = Network(config, is_rollout_agent=False, pre_trained_reward=pre_trained_reward)

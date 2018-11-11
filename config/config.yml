@@ -1,8 +1,8 @@
 general:
   name:
-#  random_seed: 123
+  random_seed: 123
 #  random_seed: 456
-  random_seed: 789
+#  random_seed: 789
   updates_cycle_count: 10000
   episodes_per_update: 16
   model_updates_per_cycle: 40
@@ -10,9 +10,10 @@ general:
   max_path_slack: 1.5
   gpu_usage: 0.01
   actor_gpu_usage: 0.01
-  actor_processes: 2
-  collector_processes: 4
-#  actor_processes: 1
+#  actor_processes: 2
+#  collector_processes: 4
+  actor_processes: 4
+  collector_processes: 8
   write_train_summaries: 500
   save_model_every_cycles: 100
 
@@ -38,13 +39,16 @@ model:
   batch_size: 512
   gamma: 0.99
   potential_points: [2, 0., 0.075, 3, 0., 0.085, 4, -0.02, 0.05, 4, 0.005, 0.05, 5, 0.005, 0.035, 5, -0.02, 0.035]
-  tau: 0.05
+#  tau: 0.05
+  tau: 0.01
   consider_image: False
   consider_goal_pose: True
   random_action_probability: 0.2
   random_noise_std: 0.05
-#  use_reward_model: True
-  use_reward_model: False
+  use_reward_model: True
+#  use_reward_model: False
+  reward_model_name: '2018_11_10_09_02_38' # hard workspace
+#  reward_model_name: '2018_10_31_10_44_31' # easy workspace
 
 test:
   test_every_cycles: 50
