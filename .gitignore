@@ -5,3 +5,5 @@
 /config/*.zae
 actor*.sh
 collector*.sh
+/important_models
+/supervised_data
