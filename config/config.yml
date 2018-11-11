@@ -16,6 +16,9 @@ general:
   collector_processes: 8
   write_train_summaries: 500
   save_model_every_cycles: 100
+#  params_file: # for no params
+#  params_file: 'params_simple.pkl' # simple workspace
+  params_file: 'params_hard.pkl' # hard workspace
 
 openrave_rl:
   action_step_size: 0.025

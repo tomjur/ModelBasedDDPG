@@ -42,7 +42,10 @@ class QueryCollectorProcess(multiprocessing.Process):
         with open(collector_file, 'w') as f:
             f.write('kill -9 {}'.format(collector_id))
 
-        workspace_params = WorkspaceParams.load_from_file('params.pkl')
+        params_file = self.config['general']['params_file']
+        workspace_params = None
+        if params_file is not None:
+            workspace_params = WorkspaceParams.load_from_file(params_file)
         self.openrave_interface = OpenraveRLInterface(self.config, workspace_params)
         self._run_main_loop()
 
