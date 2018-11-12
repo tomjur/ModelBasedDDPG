@@ -157,6 +157,8 @@ class Network(object):
             tf.summary.scalar('critic_total_loss', self.critic_total_loss),
             tf.summary.scalar('critic_gradients_norm_initial', self.critic_initial_gradients_norm),
             tf.summary.scalar('critic_gradients_norm_clipped', self.critic_clipped_gradients_norm),
+            tf.summary.scalar('critic_mean_prediction', tf.reduce_mean(self.online_q_value_fixed_action)),
+            tf.summary.histogram('critic_prediction_distribution', self.online_q_value_fixed_action),
         ])
 
         # when training the actor we derive the advantage w.r.t mu's network params (mu is the online policy)
