@@ -12,9 +12,6 @@ class Network(object):
     def __init__(self, config, is_rollout_agent, image_shape=(445, 222, 3), number_of_joints=4, pose_dimensions=2,
                  pre_trained_reward=None):
         self.config = config
-        tau = self.config['model']['tau']
-        gamma = self.config['model']['gamma']
-
         self.potential_points = PotentialPoint.from_config(config)
 
         # input related data
@@ -53,6 +50,8 @@ class Network(object):
         if is_rollout_agent:
             return
 
+        tau = self.config['model']['tau']
+        gamma = self.config['model']['gamma']
         use_reward_model = self.config['model']['use_reward_model']
         self.forward_model_next_state, self.forward_model_action, forward_model_tanh = None, None, None
         if use_reward_model:
@@ -271,9 +270,8 @@ class Network(object):
 
     def _create_actor_network(self, joints_input, is_online, reuse_flag):
         name_prefix = '{}_actor_{}'.format(os.getpid(), 'online' if is_online else 'target')
-        hidden_layers_after_combine = self.config['action_predictor']['layers']
         activation = get_activation(self.config['action_predictor']['activation'])
-        layers = hidden_layers_after_combine + [self.number_of_joints]
+        layers = self.config['action_predictor']['layers'] + [self.number_of_joints]
         current = self._generate_policy_features(joints_input)
         for i, layer_size in enumerate(layers[:-1]):
             current = tf.layers.dense(
@@ -289,7 +287,7 @@ class Network(object):
     def _create_critic_network(self, joints_input, action_input, is_online, reuse_flag, add_regularization_loss):
         name_prefix = '{}_critic_{}'.format(os.getpid(), 'online' if is_online else 'target')
         layers_before_action = self.config['critic']['layers_before_action']
-        layers_after_action = self.config['critic']['layers_after_action'] + [1]
+        layers_after_action = self.config['critic']['layers_after_action']
         activation = get_activation(self.config['critic']['activation'])
 
         current = self._generate_policy_features(joints_input)
@@ -306,7 +304,22 @@ class Network(object):
                 current, layer_size, activation=_activation, name='{}_after_action_{}'.format(name_prefix, i),
                 reuse=reuse_flag, kernel_regularizer=layers.l2_regularizer(scale)
             )
-        return current
+
+        q_val = tf.layers.dense(
+            current, 1, activation=tf.nn.tanh, name='{}_tanh_layer'.format(name_prefix), reuse=reuse_flag,
+            kernel_regularizer=layers.l2_regularizer(scale)
+        )
+        if self.config['critic']['last_layer_tanh']:
+            q_val_with_stretch = tf.layers.dense(
+                tf.ones_like(q_val), 1, tf.abs, False, name='{}_stretch'.format(name_prefix), reuse=reuse_flag,
+                kernel_regularizer=layers.l2_regularizer(scale)
+            ) * q_val
+            return q_val_with_stretch
+        else:
+            gamma = self.config['model']['gamma']
+            stretch = 1.0 / (1.0 - gamma)
+            q_val_with_stretch = stretch * q_val
+            return q_val_with_stretch
 
     def train_critic(
             self, joint_inputs, workspace_image_inputs, goal_pose_inputs, goal_joints_inputs, action_inputs, q_label,

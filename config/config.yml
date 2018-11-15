@@ -12,13 +12,13 @@ general:
   actor_gpu_usage: 0.01
 #  actor_processes: 2
 #  collector_processes: 4
-  actor_processes: 4
-  collector_processes: 8
+  actor_processes: 6
+  collector_processes: 12
   write_train_summaries: 500
   save_model_every_cycles: 100
 #  params_file: # for no params
-#  params_file: 'params_simple.pkl' # simple workspace
-  params_file: 'params_hard.pkl' # hard workspace
+  params_file: 'params_simple.pkl' # simple workspace
+#  params_file: 'params_hard.pkl' # hard workspace
 
 openrave_rl:
   action_step_size: 0.025
@@ -42,14 +42,14 @@ model:
   batch_size: 512
   gamma: 0.99
   potential_points: [2, 0., 0.075, 3, 0., 0.085, 4, -0.02, 0.05, 4, 0.005, 0.05, 5, 0.005, 0.035, 5, -0.02, 0.035]
-#  tau: 0.05
-  tau: 0.01
+  tau: 0.05
+#  tau: 0.01
   consider_image: False
   consider_goal_pose: True
   random_action_probability: 0.2
   random_noise_std: 0.05
-  use_reward_model: True
-#  use_reward_model: False
+#  use_reward_model: True
+  use_reward_model: False
   reward_model_name: '2018_11_10_09_02_38' # hard workspace
 #  reward_model_name: '2018_10_31_10_44_31' # easy workspace
 
@@ -74,8 +74,7 @@ curriculum:
 
 actor:
   learning_rate: 0.001
-#  learning_rate: 0.0001
-#  gradient_limit: 1.0
+#  gradient_limit: 0.1
   gradient_limit: 0.0
 
 action_predictor:
@@ -87,6 +86,7 @@ action_predictor:
 
 critic:
   learning_rate: 0.001
+  learning_rate: 0.01
   gradient_limit: 1.0
 #  gradient_limit: 0.0
   layers_before_action: [200, 200]
@@ -97,7 +97,10 @@ critic:
 #  layers_after_action: [64, 64]
   activation: 'elu'
 #  l2_regularization_coefficient: 0.0
-  l2_regularization_coefficient: 0.000001
+#  l2_regularization_coefficient: 0.000001
+  l2_regularization_coefficient: 0.0001
+  last_layer_tanh: True
+#  last_layer_tanh: False
 
 reward:
   learning_rate: 0.001
