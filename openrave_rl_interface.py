@@ -78,14 +78,21 @@ class OpenraveRLInterface:
                 self.max_planner_iterations -= self.planner_iterations_decrease
                 return self._split_trajectory(traj), start_joints, goal_joints
 
-    def start_new_random(self, allowed_start_goal_difference=None):
+    def start_new_random(self, allowed_start_goal_difference=None, return_traj=False):
         traj, start_joints, goal_joints = self.find_random_trajectory(allowed_start_goal_difference)
-        return self.start_specific(traj, start_joints, goal_joints)
+        return self.start_specific(traj, start_joints, goal_joints, return_traj=return_traj)
 
-    def start_specific(self, traj, start_joints, goal_joints):
+    def start_specific(self, traj, start_joints, goal_joints, return_traj=False):
         self.traj = traj
-        path_length = self._compute_length(self.traj)
-        steps_required_for_motion_plan = max([int(path_length / self.action_step_size), 1])
+        # assert path is legal
+        step_size = self.action_step_size + 0.00001
+        for i in range(len(traj)-1):
+            step_i_size = np.linalg.norm(np.array(traj[i]) - np.array(traj[i+1]))
+            assert step_i_size < step_size, 'step_i_size {}'.format(step_i_size)
+        steps_required_for_motion_plan = len(traj)
+
+        # path_length = self._compute_length(self.traj)
+        # steps_required_for_motion_plan = max([int(path_length / self.action_step_size), 1])
         # set the new trajectory parameters
         self.current_joints = np.array(start_joints)
         self.start_joints = np.array(start_joints)
@@ -95,7 +102,10 @@ class OpenraveRLInterface:
         if self.workspace_params is not None:
             image = self.workspace_params.get_image_as_numpy()
         # the agent gets the staring joints and the goal joints and the workspace image
-        return start_joints, goal_joints, image, steps_required_for_motion_plan
+        if return_traj:
+            return start_joints, goal_joints, image, steps_required_for_motion_plan, traj
+        else:
+            return start_joints, goal_joints, image, steps_required_for_motion_plan
 
     @staticmethod
     def _is_valid_region(start_pose, goal_pose):
@@ -127,14 +137,14 @@ class OpenraveRLInterface:
         # all tests failed
         return False
 
-    @staticmethod
-    def _compute_length(traj):
-        traj_length = 0.0
-        for i in range(len(traj)-1):
-            current_point = np.array(traj[i])
-            next_point = np.array(traj[i+1])
-            traj_length += np.linalg.norm(current_point-next_point)
-        return traj_length
+    # @staticmethod
+    # def _compute_length(traj):
+    #     traj_length = 0.0
+    #     for i in range(len(traj)-1):
+    #         current_point = np.array(traj[i])
+    #         next_point = np.array(traj[i+1])
+    #         traj_length += np.linalg.norm(current_point-next_point)
+    #     return traj_length
 
     def step(self, joints_action):
         # compute next joints
