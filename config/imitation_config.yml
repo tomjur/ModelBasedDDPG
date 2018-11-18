@@ -1,0 +1,53 @@
+general:
+  epochs: 5000
+  save_every_epochs: 5
+  gpu_usage: 0.01
+  actor_gpu_usage: 0.01
+  collector_processes: 4
+  actor_processes: 2
+  episodes_per_update: 16
+  max_path_slack: 1.5
+  params_file: 'params_simple.pkl' # simple workspace
+#  params_file: 'params_hard.pkl' # hard workspace
+
+test:
+  number_of_episodes: 50
+
+openrave_rl:
+  action_step_size: 0.025
+  segment_validity_step: 0.001
+  goal_sensitivity: 0.04
+  planner_iterations_start: 100
+  planner_iterations_increase: 10
+  planner_iterations_decrease: 1
+  keep_alive_penalty: 0.01
+  truncate_penalty: 0.05
+#  shaping_coefficient: 0.01
+  shaping_coefficient: 0.0
+  challenging_trajectories_only: True
+#  challenging_trajectories_only: False
+
+model:
+  batch_size: 1024
+  potential_points: [2, 0., 0.075, 3, 0., 0.085, 4, -0.02, 0.05, 4, 0.005, 0.05, 5, 0.005, 0.035, 5, -0.02, 0.035]
+  consider_image: False
+  consider_goal_pose: True
+
+action_predictor:
+  layers: [200, 200, 200, 200]
+#  layers: [64, 64, 64]
+  activation: 'elu'
+  tanh_preactivation_loss_coefficient: 1.0
+#  tanh_preactivation_loss_coefficient: 0.0
+
+imitation:
+#  initial_learn_rate: 0.001
+  initial_learn_rate: 0.0001
+  decrease_learn_rate_after: 2000
+#  decrease_learn_rate_after: 10000
+  learn_rate_decrease_rate: 0.8
+#  learning_rate: 0.0001
+  gradient_limit: 5.0
+#  gradient_limit: 0.0
+
+
