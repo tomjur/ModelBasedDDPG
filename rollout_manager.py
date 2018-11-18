@@ -1,5 +1,6 @@
 import os
 import copy
+import random
 import numpy as np
 import tensorflow as tf
 import multiprocessing
@@ -24,7 +25,7 @@ class QueryCollectorProcess(multiprocessing.Process):
         required_trajectories = episodes_per_update * 10
         while True:
             try:
-                next_collector_specific_task = self.collector_specific_queue.get(block=True, timeout=0.001)
+                next_collector_specific_task = self.collector_specific_queue.get(block=True, timeout=0.1)
                 task_type = next_collector_specific_task[0]
                 # can only terminate
                 self.collector_specific_queue.task_done()
@@ -132,7 +133,8 @@ class ActorProcess(multiprocessing.Process):
         end_episode_time = datetime.datetime.now()
         find_trajectory_time = start_rollout_time - start_episode_time
         rollout_time = end_episode_time-start_rollout_time
-        return status, states, actions, rewards, goal_pose, goal_joints, workspace_image, find_trajectory_time, rollout_time
+        return status, states, actions, rewards, goal_pose, goal_joints, workspace_image, find_trajectory_time, \
+               rollout_time
 
     def _run_main_loop(self, sess):
         while True:
@@ -196,28 +198,29 @@ class ActorProcess(multiprocessing.Process):
 
 
 class RolloutManager:
-    def __init__(self, config):
+    def __init__(self, config, collector_processes=None, actor_processes=None, fixed_queries=None):
         self.episode_generation_queue = multiprocessing.JoinableQueue()
         self.episode_results_queue = multiprocessing.Queue()
         self.query_results_queue = multiprocessing.Queue()
-        self.collector_specific_queue = [
-            multiprocessing.JoinableQueue() for _ in range(config['general']['collector_processes'])
-        ]
-        self.actor_specific_queues = [
-            multiprocessing.JoinableQueue() for _ in range(config['general']['actor_processes'])
-        ]
+        if collector_processes is None:
+            collector_processes = config['general']['collector_processes']
+        if actor_processes is None:
+            actor_processes = config['general']['actor_processes']
+        self.fixed_queries = fixed_queries
+
+        self.collector_specific_queue = [multiprocessing.JoinableQueue() for _ in range(collector_processes)]
+        self.actor_specific_queues = [multiprocessing.JoinableQueue() for _ in range(actor_processes)]
 
         self.collectors = [
             QueryCollectorProcess(
                 copy.deepcopy(config), self.query_results_queue, self.collector_specific_queue[i]
             )
-            for i in range(config['general']['collector_processes'])
+            for i in range(collector_processes)
         ]
         self.actors = [
-            ActorProcess(
-                copy.deepcopy(config), self.episode_generation_queue, self.episode_results_queue, self.actor_specific_queues[i]
-            )
-            for i in range(config['general']['actor_processes'])
+            ActorProcess(copy.deepcopy(config), self.episode_generation_queue, self.episode_results_queue,
+                         self.actor_specific_queues[i])
+            for i in range(actor_processes)
         ]
         # start all the collector processes
         for c in self. collectors:
@@ -232,12 +235,24 @@ class RolloutManager:
             actor_queue.join()
 
     def generate_episodes(self, number_of_episodes, is_train):
-        for i in range(number_of_episodes):
-            # get a query
-            query = self.query_results_queue.get()
-            message = (query, is_train)
-            # place in queue
-            self.episode_generation_queue.put(message)
+        if self.fixed_queries is None:
+            # use collectors to generate queries
+            for i in range(number_of_episodes):
+                # get a query
+                query = self.query_results_queue.get()
+                message = (query, is_train)
+                # place in queue
+                self.episode_generation_queue.put(message)
+        else:
+            #  use the fixed queries
+            random.shuffle(self.fixed_queries)
+            for (traj, image, goal_pose) in self.fixed_queries[:number_of_episodes]:
+                start_joints = traj[0]
+                goal_joints = traj[-1]
+                query = (traj, start_joints, goal_joints)
+                message = (query, is_train)
+                # place in queue
+                self.episode_generation_queue.put(message)
 
         self.episode_generation_queue.join()
 
@@ -257,7 +272,8 @@ class RolloutManager:
         self._post_private_message(message, self.actor_specific_queues)
         self._post_private_message(message, self.collector_specific_queue)
 
-    def _post_private_message(self, message, queues):
+    @staticmethod
+    def _post_private_message(message, queues):
         for queue in queues:
             queue.put(message)
         for queue in queues:
