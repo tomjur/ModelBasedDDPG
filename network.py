@@ -305,21 +305,25 @@ class Network(object):
                 reuse=reuse_flag, kernel_regularizer=layers.l2_regularizer(scale)
             )
 
-        q_val = tf.layers.dense(
-            current, 1, activation=tf.nn.tanh, name='{}_tanh_layer'.format(name_prefix), reuse=reuse_flag,
-            kernel_regularizer=layers.l2_regularizer(scale)
-        )
         if self.config['critic']['last_layer_tanh']:
+            q_val = tf.layers.dense(
+                current, 1, activation=tf.nn.tanh, name='{}_tanh_layer'.format(name_prefix), reuse=reuse_flag,
+                kernel_regularizer=layers.l2_regularizer(scale)
+            )
             q_val_with_stretch = tf.layers.dense(
                 tf.ones_like(q_val), 1, tf.abs, False, name='{}_stretch'.format(name_prefix), reuse=reuse_flag,
                 kernel_regularizer=layers.l2_regularizer(scale)
             ) * q_val
             return q_val_with_stretch
+            # gamma = self.config['model']['gamma']
+            # stretch = 1.0 / (1.0 - gamma)
+            # q_val_with_stretch = stretch * q_val
         else:
-            gamma = self.config['model']['gamma']
-            stretch = 1.0 / (1.0 - gamma)
-            q_val_with_stretch = stretch * q_val
-            return q_val_with_stretch
+            q_val = tf.layers.dense(
+                current, 1, activation=None, name='{}_linear_layer'.format(name_prefix), reuse=reuse_flag,
+                kernel_regularizer=layers.l2_regularizer(scale)
+            )
+            return q_val
 
     def train_critic(
             self, joint_inputs, workspace_image_inputs, goal_pose_inputs, goal_joints_inputs, action_inputs, q_label,
