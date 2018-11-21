@@ -38,8 +38,8 @@ def run_for_config(config, print_messages):
     summaries_dir = os.path.join(working_dir, 'tensorboard', model_name)
     completed_trajectories_dir = os.path.join(working_dir, 'trajectories', model_name)
 
-    alter_episode_mode = 0  # natural reward and original episode
-    # alter_episode_mode = 1  # use learned reward with episode truncation
+    # alter_episode_mode = 0  # natural reward and original episode
+    alter_episode_mode = 1  # use learned reward with episode truncation
     # alter_episode_mode = 2  # use learned reward without episode truncation
 
     # load pretrained model if required
@@ -50,9 +50,30 @@ def run_for_config(config, print_messages):
     # generate graph:
     network = Network(config, is_rollout_agent=False, pre_trained_reward=pre_trained_reward)
 
+    def unpack_state_batch(state_batch):
+        joints = [state[0] for state in state_batch]
+        poses = {p.tuple: [state[1][p.tuple] for state in state_batch] for p in network.potential_points}
+        jacobians = None
+        # jacobians = {p.tuple: [state[2][p.tuple] for state in state_batch] for p in network.potential_points}
+        return joints, poses, jacobians
+
+    def score_for_hindsight(augmented_buffer):
+        # unzip
+        goal_pose_list, goal_joints_list, workspace_image_list, current_state_list, action_used_list, _, __,  ___ = zip(
+            *augmented_buffer)
+        # unpack current and next state
+        current_joints, _, __ = unpack_state_batch(current_state_list)
+
+        fake_rewards, fake_status_prob = pre_trained_reward.make_prediction(
+            sess, current_joints, goal_joints_list, action_used_list, goal_pose_list)
+
+        fake_status = np.argmax(np.array(fake_status_prob), axis=1)
+        is_terminal_flags = [f>0 for f in fake_status]
+        return list(fake_rewards), is_terminal_flags
+
     # initialize replay memory
     replay_buffer = ReplayBuffer(config)
-    hindsight_policy = HindsightPolicy(config, replay_buffer)
+    hindsight_policy = HindsightPolicy(config, replay_buffer, score_for_hindsight)
 
     # save model
     saver = tf.train.Saver(max_to_keep=4, save_relative_paths=saver_dir)
@@ -62,13 +83,6 @@ def run_for_config(config, print_messages):
     rollout_manager = RolloutManager(config)
 
     test_results = []
-
-    def unpack_state_batch(state_batch):
-        joints = [state[0] for state in state_batch]
-        poses = {p.tuple: [state[1][p.tuple] for state in state_batch] for p in network.potential_points}
-        jacobians = None
-        # jacobians = {p.tuple: [state[2][p.tuple] for state in state_batch] for p in network.potential_points}
-        return joints, poses, jacobians
 
     def update_model(sess, global_step):
         batch_size = config['model']['batch_size']

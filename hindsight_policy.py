@@ -3,12 +3,16 @@ from potential_point import PotentialPoint
 
 
 class HindsightPolicy:
-    def __init__(self, config, replay_buffer):
+    def __init__(self, config, replay_buffer, predict_reward_and_status_func):
         self.config = config
         self.replay_buffer = replay_buffer
         self.target_potential_point = PotentialPoint.from_config(config)[-1]
+        self.predict_reward_and_status_func = predict_reward_and_status_func
+        # the following buffer saves the transition we are about to add
+        self.augmented_buffer = []
 
     def append_to_replay_buffer(self, status, states, actions, rewards, goal_pose, goal_joints, workspace_image):
+        self.augmented_buffer = []
         for i in range(len(actions)):
             current_state = states[i]
             next_state = states[i+1]
@@ -21,6 +25,18 @@ class HindsightPolicy:
                 next_state
             )
             self._add_extra_data(i, status, states, actions, rewards, workspace_image)
+        self._score_extra_data_and_add_to_buffer()
+
+    def _score_extra_data_and_add_to_buffer(self):
+        if len(self.augmented_buffer) == 0:
+            return
+        rewards, terminal_flags = self.predict_reward_and_status_func(self.augmented_buffer)
+        for i, transition in enumerate(self.augmented_buffer):
+            goal_pose, goal_joints, workspace_image, current_state, action_used, current_reward, is_terminal, next_state = transition
+            self.replay_buffer.add(
+                goal_pose, goal_joints, workspace_image, current_state, action_used, rewards[i], terminal_flags[i],
+                next_state
+            )
 
     def _add_extra_data(self, current_state_index, status, states, actions, rewards, workspace_image):
         if not self.config['hindsight']['enable']:
@@ -69,10 +85,6 @@ class HindsightPolicy:
         next_state = states[current_state_index + 1]
         current_reward = 1.0 if current_state_index + 1 == goal_state_index else rewards[current_state_index]
         is_terminal = True if current_state_index + 1 == goal_state_index else False
-        self.replay_buffer.add(
-            goal_pose, goal_joints, workspace_image, current_state, action_used, current_reward, is_terminal,
-            next_state
-        )
-
-
-
+        transition = goal_pose, goal_joints, workspace_image, current_state, action_used, current_reward, is_terminal,\
+                     next_state
+        self.augmented_buffer.append(transition)
