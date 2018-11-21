@@ -2,7 +2,6 @@
 /models
 /tensorboard
 /_temp_scripts
-/config/*.zae
 actor*.sh
 collector*.sh
 /important_models
