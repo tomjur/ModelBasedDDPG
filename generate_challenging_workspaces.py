@@ -1,3 +1,4 @@
+import datetime
 import yaml
 import os
 
@@ -64,6 +65,7 @@ def _try_plan(workspace_params, openrave_manager):
 
 
 workspace_count = 0
+a = datetime.datetime.now()
 while workspace_count < number_of_workspaces:
     workspace_params = generator.generate_workspace()
     openrave_manager = OpenraveManager(config['openrave_rl']['segment_validity_step'],
@@ -84,9 +86,11 @@ while workspace_count < number_of_workspaces:
             workspace_count += 1
             print 'workspace found'
             break
+    b = datetime.datetime.now()
     print 'workspace count {}'.format(workspace_count)
     print 'trajectories tried {}'.format(i)
     print 'success count {}'.format(successful_trajectories_count)
+    print 'time since start {}'.format(b-a)
     print ''
 
 
