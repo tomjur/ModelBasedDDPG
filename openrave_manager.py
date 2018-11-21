@@ -61,7 +61,7 @@ class OpenraveManager(object):
         joint_bounds = self.get_joint_bounds()
         result = []
         for i in range(self.get_number_of_joints()):
-            if i in fixed_positions_dictionary:
+            if fixed_positions_dictionary is not None and i in fixed_positions_dictionary:
                 result.append(fixed_positions_dictionary[i])
             else:
                 result.append(random.uniform(joint_bounds[0][i], joint_bounds[1][i]))
