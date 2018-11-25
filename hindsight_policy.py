@@ -30,13 +30,17 @@ class HindsightPolicy:
     def _score_extra_data_and_add_to_buffer(self):
         if len(self.augmented_buffer) == 0:
             return
-        rewards, terminal_flags = self.predict_reward_and_status_func(self.augmented_buffer)
-        for i, transition in enumerate(self.augmented_buffer):
-            goal_pose, goal_joints, workspace_image, current_state, action_used, current_reward, is_terminal, next_state = transition
-            self.replay_buffer.add(
-                goal_pose, goal_joints, workspace_image, current_state, action_used, rewards[i], terminal_flags[i],
-                next_state
-            )
+        if self.config['hindsight']['score_with_reward_model']:
+            rewards, terminal_flags = self.predict_reward_and_status_func(self.augmented_buffer)
+            for i, transition in enumerate(self.augmented_buffer):
+                goal_pose, goal_joints, workspace_image, current_state, action_used, current_reward, is_terminal, next_state = transition
+                self.replay_buffer.add(
+                    goal_pose, goal_joints, workspace_image, current_state, action_used, rewards[i], terminal_flags[i],
+                    next_state
+                )
+        else:
+            for transition in self.augmented_buffer:
+                self.replay_buffer.add(*zip(transition))
 
     def _add_extra_data(self, current_state_index, status, states, actions, rewards, workspace_image):
         if not self.config['hindsight']['enable']:

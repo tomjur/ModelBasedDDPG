@@ -38,14 +38,11 @@ def run_for_config(config, print_messages):
     summaries_dir = os.path.join(working_dir, 'tensorboard', model_name)
     completed_trajectories_dir = os.path.join(working_dir, 'trajectories', model_name)
 
-    # alter_episode_mode = 0  # natural reward and original episode
-    alter_episode_mode = 1  # use learned reward with episode truncation
-    # alter_episode_mode = 2  # use learned reward without episode truncation
-
     # load pretrained model if required
     pre_trained_reward = None
-    if alter_episode_mode > 0 or config['model']['use_reward_model']:
-        pre_trained_reward = PreTrainedReward(config['model']['reward_model_name'], config)
+    reward_model_name = config['model']['reward_model_name']
+    if reward_model_name is not None:
+        pre_trained_reward = PreTrainedReward(reward_model_name, config)
 
     # generate graph:
     network = Network(config, is_rollout_agent=False, pre_trained_reward=pre_trained_reward)
@@ -54,7 +51,6 @@ def run_for_config(config, print_messages):
         joints = [state[0] for state in state_batch]
         poses = {p.tuple: [state[1][p.tuple] for state in state_batch] for p in network.potential_points}
         jacobians = None
-        # jacobians = {p.tuple: [state[2][p.tuple] for state in state_batch] for p in network.potential_points}
         return joints, poses, jacobians
 
     def score_for_hindsight(augmented_buffer):
@@ -134,9 +130,11 @@ def run_for_config(config, print_messages):
 
     def alter_episode(status, states, actions, rewards, goal_pose, goal_joints, workspace_image, find_trajectory_time,
                       rollout_time):
+        alter_episode_mode = config['model']['alter_episode']
         if alter_episode_mode == 0:
             return status, states, actions, rewards, goal_pose, goal_joints, workspace_image, find_trajectory_time, \
                    rollout_time
+        assert pre_trained_reward is not None
         # first unpack states:
         joints, poses, jacobians = unpack_state_batch(states)
         current_joints = joints[:len(joints)-1]
@@ -229,7 +227,7 @@ def run_for_config(config, print_messages):
             print_state('train', episodes, successful_episodes, collision_episodes, max_len_episodes)
 
             # do updates
-            if replay_buffer.size() > config['model']['intial_samples_before_train']:
+            if replay_buffer.size() > config['model']['batch_size']:
                 a = datetime.datetime.now()
                 for _ in range(config['general']['model_updates_per_cycle']):
                     summaries = update_model(sess, global_step)
