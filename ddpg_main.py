@@ -55,17 +55,23 @@ def run_for_config(config, print_messages):
 
     def score_for_hindsight(augmented_buffer):
         # unzip
-        goal_pose_list, goal_joints_list, workspace_image_list, current_state_list, action_used_list, _, __,  ___ = zip(
-            *augmented_buffer)
+        goal_pose_list, goal_joints_list, workspace_image_list, current_state_list, action_used_list, _, is_goal_list,\
+        __ = zip(*augmented_buffer)
+        # make one hot status vector:
+        is_goal_one_hot_list = np.zeros((len(is_goal_list), 3), dtype=np.float32)
+        for i in range(len(is_goal_list)):
+            if is_goal_list[i]:
+                is_goal_one_hot_list[i, 2] = 1.0  # mark as goal transition
+            else:
+                is_goal_one_hot_list[i, 0] = 1.0  # mark as free transition
         # unpack current and next state
         current_joints, _, __ = unpack_state_batch(current_state_list)
 
-        fake_rewards, fake_status_prob = pre_trained_reward.make_prediction(
-            sess, current_joints, goal_joints_list, action_used_list, goal_pose_list)
-
-        fake_status = np.argmax(np.array(fake_status_prob), axis=1)
-        is_terminal_flags = [f>0 for f in fake_status]
-        return list(fake_rewards), is_terminal_flags
+        fake_rewards, _ = pre_trained_reward.make_prediction(
+            sess, current_joints, goal_joints_list, action_used_list, goal_pose_list,
+            all_transition_labels=is_goal_one_hot_list
+        )
+        return list(fake_rewards)
 
     # initialize replay memory
     replay_buffer = ReplayBuffer(config)
@@ -139,25 +145,33 @@ def run_for_config(config, print_messages):
         joints, poses, jacobians = unpack_state_batch(states)
         current_joints = joints[:len(joints)-1]
         #  make a prediction
-        fake_rewards, fake_status_prob = pre_trained_reward.make_prediction(sess, current_joints, [goal_joints]*len(actions), actions, [goal_pose]*len(actions))
         if alter_episode_mode == 2:
-            # change the rewards but keep episode the same
+            # change the rewards but keep episode the same, use he status in the reward prediction
+            one_hot_status = np.zeros((len(rewards), 3), dtype=np.float32)
+            one_hot_status[:-1, 0] = 1.0
+            one_hot_status[-1, 2] = 1.0
+            fake_rewards = pre_trained_reward.make_prediction(
+                sess, current_joints, [goal_joints] * len(actions), actions, [goal_pose] * len(actions),
+                all_transition_labels=one_hot_status
+            )[0]
             return status, states, actions, [r[0] for r in fake_rewards], goal_pose, goal_joints, workspace_image, \
                    find_trajectory_time, rollout_time
-
-        # get the maximal status for each transition (the indices are from 0-2 while the status are 1-3)
-        fake_status = np.argmax(np.array(fake_status_prob), axis=1)
-        fake_status += 1
-        # iterate over approximated episode and see if truncation is needed
-        truncation_index = 0
-        for truncation_index in range(len(fake_status)):
-            if fake_status[truncation_index] != 1:
-                break
-        # return the status of the last transition, truncated list of states and actions, the fake rewards (also
-        # truncated) and the goal parameters as-is.
-        return fake_status[truncation_index], states[:truncation_index+2], actions[:truncation_index+1], \
-               [r[0] for r in fake_rewards[:truncation_index+1]], goal_pose, goal_joints, workspace_image, \
-               find_trajectory_time, rollout_time
+        if alter_episode_mode == 1:
+            # get the maximal status for each transition (the indices are from 0-2 while the status are 1-3)
+            fake_rewards, fake_status_prob = pre_trained_reward.make_prediction(
+                sess, current_joints, [goal_joints]*len(actions), actions, [goal_pose]*len(actions))
+            fake_status = np.argmax(np.array(fake_status_prob), axis=1)
+            fake_status += 1
+            # iterate over approximated episode and see if truncation is needed
+            truncation_index = 0
+            for truncation_index in range(len(fake_status)):
+                if fake_status[truncation_index] != 1:
+                    break
+            # return the status of the last transition, truncated list of states and actions, the fake rewards (also
+            # truncated) and the goal parameters as-is.
+            return fake_status[truncation_index], states[:truncation_index+2], actions[:truncation_index+1], \
+                   [r[0] for r in fake_rewards[:truncation_index+1]], goal_pose, goal_joints, workspace_image, \
+                   find_trajectory_time, rollout_time
 
     def print_state(prefix, episodes, successful_episodes, collision_episodes, max_len_episodes):
         if not print_messages:

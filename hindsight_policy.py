@@ -31,11 +31,12 @@ class HindsightPolicy:
         if len(self.augmented_buffer) == 0:
             return
         if self.config['hindsight']['score_with_reward_model']:
-            rewards, terminal_flags = self.predict_reward_and_status_func(self.augmented_buffer)
+            rewards = self.predict_reward_and_status_func(self.augmented_buffer)
             for i, transition in enumerate(self.augmented_buffer):
-                goal_pose, goal_joints, workspace_image, current_state, action_used, current_reward, is_terminal, next_state = transition
+                goal_pose, goal_joints, workspace_image, current_state, action_used, current_reward, is_terminal, \
+                next_state = transition
                 self.replay_buffer.add(
-                    goal_pose, goal_joints, workspace_image, current_state, action_used, rewards[i], terminal_flags[i],
+                    goal_pose, goal_joints, workspace_image, current_state, action_used, rewards[i], is_terminal,
                     next_state
                 )
         else:
