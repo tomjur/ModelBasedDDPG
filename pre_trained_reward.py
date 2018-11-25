@@ -23,6 +23,7 @@ class PreTrainedReward:
         if config['model']['consider_goal_pose']:
             self.goal_pose_inputs = tf.placeholder(tf.float32, (None, 2), name='goal_pose_inputs')
         self.action_inputs = tf.placeholder(tf.float32, (None, 4), name='action_inputs')
+        self.transition_label = tf.placeholder_with_default([[0.0]*3], (None, 3), name='labeled_transition')
         current_variables_count = len(tf.trainable_variables())
         self.reward_prediction, self.status_softmax_logits = self.create_reward_network(
             self.joints_inputs, self.action_inputs, self.goal_joints_inputs, self.goal_pose_inputs,
@@ -78,10 +79,14 @@ class PreTrainedReward:
         softmax_logits = current
         softmax_res = tf.nn.softmax(softmax_logits)
 
+        # if the one-hot input is fed, is labeled will be 1.0 otherwise it will be zero
+        is_labeled = tf.expand_dims(tf.reduce_max(self.transition_label, axis=1), axis=1)
+        reward_calculation_input = self.transition_label + tf.multiply(1.0 - is_labeled, softmax_res)
+
         # get the classification reward
         classification_reward = tf.layers.dense(
-                softmax_res, 1, activation=None, use_bias=False, name='{}_classification_reward'.format(name_prefix),
-                reuse=self._reuse_flag
+            reward_calculation_input, 1, activation=None, use_bias=False,
+            name='{}_classification_reward'.format(name_prefix), reuse=self._reuse_flag
             )
 
         # get the clipping-related reward
@@ -101,11 +106,13 @@ class PreTrainedReward:
     def load_weights(self, sess):
         self.saver.restore(sess, tf.train.latest_checkpoint(self.saver_dir))
 
-    def make_prediction(self, sess, all_start_joints, all_goal_joints, all_actions, all_goal_poses):
-        feed = self.make_feed(all_start_joints, all_goal_joints, all_actions, all_goal_poses)
+    def make_prediction(
+            self, sess, all_start_joints, all_goal_joints, all_actions, all_goal_poses, all_transition_labels=None
+    ):
+        feed = self.make_feed(all_start_joints, all_goal_joints, all_actions, all_goal_poses, all_transition_labels)
         return sess.run([self.reward_prediction, self.status_softmax_logits], feed)
 
-    def make_feed(self, all_start_joints, all_goal_joints, all_actions, all_goal_poses):
+    def make_feed(self, all_start_joints, all_goal_joints, all_actions, all_goal_poses, all_transition_labels=None):
         feed = {
             self.joints_inputs: all_start_joints,
             self.goal_joints_inputs: all_goal_joints,
@@ -113,6 +120,8 @@ class PreTrainedReward:
         }
         if self.goal_pose_inputs is not None:
             feed[self.goal_pose_inputs] = all_goal_poses
+        if all_transition_labels is not None:
+            feed[self.transition_label] = all_transition_labels
         return feed
 
 

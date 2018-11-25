@@ -32,8 +32,8 @@ learn_rate_decrease_rate = config['reward']['learn_rate_decrease_rate']
 
 test_batch_size = batch_size * 10
 
-# train = load_data_from(os.path.join('supervised_data', 'train'), 10000)
-# test = load_data_from(os.path.join('supervised_data', 'test'), 10000)
+# train = load_data_from(os.path.join('supervised_data', 'train'), 2000)
+# test = load_data_from(os.path.join('supervised_data', 'test'), 2000)
 train = load_data_from(os.path.join('supervised_data', 'train'))
 test = load_data_from(os.path.join('supervised_data', 'test'))
 
@@ -141,7 +141,9 @@ with tf.Session(
             if train_batch is None:
                 continue
             train_batch, train_rewards, train_status = get_batch_and_labels(train_batch, openrave_manager)
-            train_feed = pre_trained_reward.make_feed(*train_batch)
+            train_status_one_hot = np.zeros((len(train_rewards), 3), dtype=np.float32)
+            train_status_one_hot[np.arange(len(train_rewards)), np.array(train_status)-1] = 1.0
+            train_feed = pre_trained_reward.make_feed(*train_batch, all_transition_labels=train_status_one_hot)
             train_feed[reward_input] = np.expand_dims(np.array(train_rewards), axis=1)
             train_feed[status_input] = np.array(train_status)
             train_total_loss, train_summary, current_global_step, _ = sess.run(
