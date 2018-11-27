@@ -15,10 +15,13 @@ with open(config_path, 'r') as yml_file:
 
 config['openrave_rl']['challenging_trajectories_only'] = True
 
+# number_of_trajectories = 20
+# trajectories_per_file = 4
+# threads = 2
 
-number_of_trajectories = 40000
-trajectories_per_file = 100
-threads = 20
+number_of_trajectories = 100000
+trajectories_per_file = 1000
+threads = 100
 
 data_collector = ImitationDataCollector(config, threads)
 results_dir = 'imitation_data'

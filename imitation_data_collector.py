@@ -21,9 +21,12 @@ class ActorProcess(multiprocessing.Process):
         self.openrave_interface = None
 
     def _get_tuple(self):
-        start_joints, goal_joints, image, _, traj = self.openrave_interface.start_new_random(None, return_traj=True)
+        start_joints, goal_joints, image, _, trajectory = self.openrave_interface.start_new_random(
+            None, return_traj=True)
+        trajectory_poses = [
+            self.openrave_interface.openrave_manager.get_potential_points_poses(step) for step in trajectory]
         goal_pose = self.openrave_interface.openrave_manager.get_target_pose(goal_joints)
-        return traj, image, goal_pose
+        return trajectory, image, goal_pose, trajectory_poses
 
     def _run_main_loop(self):
         while True:
