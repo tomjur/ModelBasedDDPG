@@ -19,7 +19,6 @@ class OpenraveRLInterface:
         self.max_planner_iterations = self.planner_iterations_start
         self.keep_alive_penalty = config['openrave_rl']['keep_alive_penalty']
         self.truncate_penalty = config['openrave_rl']['truncate_penalty']
-        self.shaping_coefficient = config['openrave_rl']['shaping_coefficient']
         self.challenging_trajectories_only = config['openrave_rl']['challenging_trajectories_only']
 
         self.openrave_manager = OpenraveManager(
@@ -146,21 +145,11 @@ class OpenraveRLInterface:
         return self._get_step_result(next_joints, -self.keep_alive_penalty + reward, False, 1)
 
     def _get_step_result(self, next_joints, reward, is_terminal, enum_res):
-        total_reward = reward + self._get_shaping_reward(next_joints)
         if is_terminal:
             self.current_joints = None
         else:
             self.current_joints = next_joints
-        return list(next_joints), total_reward, is_terminal, enum_res
-
-    def _get_shaping_reward(self, next_joint):
-        if self.shaping_coefficient == 0.0:
-            return 0.0
-        traj_suffix = self.traj[self.current_shaping_index:]
-        all_distances = scipy.spatial.distance.cdist(traj_suffix, [next_joint])
-        min_distance_index = np.argmin(all_distances)
-        self.current_shaping_index = min_distance_index
-        return self.shaping_coefficient / (1.0 + all_distances[min_distance_index][0])
+        return list(next_joints), reward, is_terminal, enum_res
 
     def _split_trajectory(self, trajectory):
         max_step = self.action_step_size
