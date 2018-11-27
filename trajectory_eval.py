@@ -22,10 +22,11 @@ class TrajectoryEval:
         number_of_episodes = self.config['test']['number_of_episodes']
         episode_results = self.rollout_manager.generate_episodes(number_of_episodes, False)
         for episode_result in episode_results:
-            status = episode_result[0]
-            states = episode_result[1]
-            rewards = episode_result[3]
-            goal_pose = episode_result[4]
+            episode_agent_trajectory = episode_result[0]
+            status = episode_agent_trajectory[0]
+            states = episode_agent_trajectory[1]
+            rewards = episode_agent_trajectory[3]
+            goal_pose = episode_agent_trajectory[4]
             mean_total_reward += sum(rewards)
             # at the end of episode
             episodes += 1

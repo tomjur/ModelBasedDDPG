@@ -126,8 +126,11 @@ class ActorProcess(multiprocessing.Process):
         find_trajectory_time = start_rollout_time - start_episode_time
         rollout_time = end_episode_time-start_rollout_time
         workspace_image = None
-        return status, states, actions, rewards, goal_pose, goal_joints, workspace_image, find_trajectory_time, \
-               rollout_time, trajectory, trajectory_poses
+
+        episode_agent_trajectory = (status, states, actions, rewards, goal_pose, goal_joints, workspace_image)
+        episode_times = (find_trajectory_time, rollout_time)
+        episode_example_trajectory = (trajectory, trajectory_poses)
+        return episode_agent_trajectory, episode_times, episode_example_trajectory
 
     def _run_main_loop(self, sess):
         while True:

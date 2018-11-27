@@ -134,12 +134,10 @@ def run_for_config(config, print_messages):
         result = [critic_optimization_summaries, actor_optimization_summaries, ]
         return result
 
-    def alter_episode(status, states, actions, rewards, goal_pose, goal_joints, workspace_image, find_trajectory_time,
-                      rollout_time, motion_planner_trajectory, motion_planner_trajectory_poses):
+    def alter_episode(status, states, actions, rewards, goal_pose, goal_joints, workspace_image):
         alter_episode_mode = config['model']['alter_episode']
         if alter_episode_mode == 0:
-            return status, states, actions, rewards, goal_pose, goal_joints, workspace_image, find_trajectory_time, \
-                   rollout_time, motion_planner_trajectory, motion_planner_trajectory_poses
+            return status, states, actions, rewards, goal_pose, goal_joints, workspace_image
         assert pre_trained_reward is not None
         # first unpack states:
         joints, poses, jacobians = unpack_state_batch(states)
@@ -154,8 +152,7 @@ def run_for_config(config, print_messages):
                 sess, current_joints, [goal_joints] * len(actions), actions, [goal_pose] * len(actions),
                 all_transition_labels=one_hot_status
             )[0]
-            return status, states, actions, [r[0] for r in fake_rewards], goal_pose, goal_joints, workspace_image, \
-                   find_trajectory_time, rollout_time, motion_planner_trajectory, motion_planner_trajectory_poses
+            return status, states, actions, [r[0] for r in fake_rewards], goal_pose, goal_joints, workspace_image
         if alter_episode_mode == 1:
             # get the maximal status for each transition (the indices are from 0-2 while the status are 1-3)
             fake_rewards, fake_status_prob = pre_trained_reward.make_prediction(
@@ -169,9 +166,12 @@ def run_for_config(config, print_messages):
                     break
             # return the status of the last transition, truncated list of states and actions, the fake rewards (also
             # truncated) and the goal parameters as-is.
-            return fake_status[truncation_index], states[:truncation_index+2], actions[:truncation_index+1], \
-                   [r[0] for r in fake_rewards[:truncation_index+1]], goal_pose, goal_joints, workspace_image, \
-                   find_trajectory_time, rollout_time, motion_planner_trajectory, motion_planner_trajectory_poses
+            altered_status = fake_status[truncation_index]
+            altered_states = states[:truncation_index+2]
+            altered_actions = actions[:truncation_index+1]
+            altered_rewards = [r[0] for r in fake_rewards[:truncation_index+1]]
+            return altered_status, altered_states, altered_actions, altered_rewards, goal_pose, goal_joints, \
+                   workspace_image
 
     def print_state(prefix, episodes, successful_episodes, collision_episodes, max_len_episodes):
         if not print_messages:
@@ -234,9 +234,10 @@ def run_for_config(config, print_messages):
             total_find_trajectory_time = None
             total_rollout_time = None
             for episode_result in episode_results:
-                # run episode:
-                status, states, actions, rewards, goal_pose, goal_joints, workspace_image, find_trajectory_time, \
-                rollout_time, motion_planner_trajectory, motion_planner_trajectory_poses = alter_episode(*episode_result)
+                # single episode execution:
+                episode_agent_trajectory, episode_times, episode_example_trajectory = episode_result
+                # update the times
+                find_trajectory_time, rollout_time = episode_times
                 if total_find_trajectory_time is None:
                     total_find_trajectory_time = find_trajectory_time
                 else:
@@ -245,6 +246,8 @@ def run_for_config(config, print_messages):
                     total_rollout_time = rollout_time
                 else:
                     total_rollout_time += rollout_time
+                # post process the episode
+                status, states, actions, rewards, goal_pose, goal_joints, workspace_image, = alter_episode(*episode_agent_trajectory)
                 # at the end of episode, append to buffer
                 hindsight_policy.append_to_replay_buffer(
                     status, states, actions, rewards, goal_pose, goal_joints, workspace_image
@@ -252,6 +255,7 @@ def run_for_config(config, print_messages):
                 # if the episode failed, and we want to use the motion planners trajectories, add to buffer:
                 if status != 3 and added_failed_trajectories < config['model']['failed_motion_planner_trajectories']:
                     assert pre_trained_reward is not None
+                    motion_planner_trajectory, motion_planner_trajectory_poses = episode_example_trajectory
                     added_failed_trajectories += 1
                     hindsight_policy.append_to_replay_buffer(*process_example_trajectory(
                         motion_planner_trajectory, motion_planner_trajectory_poses, goal_pose, goal_joints, workspace_image
