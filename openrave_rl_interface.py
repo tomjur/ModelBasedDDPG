@@ -90,10 +90,6 @@ class OpenraveRLInterface:
             step_i_size = np.linalg.norm(np.array(traj[i]) - np.array(traj[i+1]))
             assert step_i_size < step_size, 'step_i_size {}'.format(step_i_size)
         steps_required_for_motion_plan = len(traj)
-
-        # path_length = self._compute_length(self.traj)
-        # steps_required_for_motion_plan = max([int(path_length / self.action_step_size), 1])
-        # set the new trajectory parameters
         self.current_joints = np.array(start_joints)
         self.start_joints = np.array(start_joints)
         self.goal_joints = np.array(goal_joints)
@@ -114,14 +110,6 @@ class OpenraveRLInterface:
     def _is_challenging(self, start_pose, goal_pose):
         if self.workspace_params is None or self.workspace_params.number_of_obstacles == 0:
             return True
-        # # check if x coordinate of any obstacle is in the middle
-        # if any([min(start_pose[0], goal_pose[0]) <= center_x <= max(start_pose[0], goal_pose[0])
-        #         for center_x in self.workspace_params.centers_position_x]):
-        #     return True
-        # # check if z coordinate of any obstacle is in the middle
-        # if any([min(start_pose[1], goal_pose[1]) <= center_z <= max(start_pose[1], goal_pose[1])
-        #         for center_z in self.workspace_params.centers_position_z]):
-        #     return True
         # check if the distance from any obstacle is smaller that the start-goal-distance
         start = np.array(start_pose)
         goal = np.array(goal_pose)
@@ -137,23 +125,8 @@ class OpenraveRLInterface:
         # all tests failed
         return False
 
-    # @staticmethod
-    # def _compute_length(traj):
-    #     traj_length = 0.0
-    #     for i in range(len(traj)-1):
-    #         current_point = np.array(traj[i])
-    #         next_point = np.array(traj[i+1])
-    #         traj_length += np.linalg.norm(current_point-next_point)
-    #     return traj_length
-
     def step(self, joints_action):
         # compute next joints
-        # action_direction = np.array(joints_action) + 0.000001
-        # action_direction /= np.linalg.norm(action_direction)
-
-        # step = np.multiply(action_direction, self.openrave_manager.get_joint_bounds()[1])
-        # step = step * self.action_step_size
-        # step = action_direction * self.action_step_size
         step = joints_action * self.action_step_size
         next_joints_before_truncate = self.current_joints + step
         next_joints = self.openrave_manager.truncate_joints(next_joints_before_truncate)
