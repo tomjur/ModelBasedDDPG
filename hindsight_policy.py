@@ -46,7 +46,6 @@ class HindsightPolicy:
     def _add_extra_data(self, current_state_index, status, states, actions, rewards, workspace_image):
         if not self.config['hindsight']['enable']:
             return
-        assert self.config['openrave_rl']['shaping_coefficient'] == 0.0
         if self.config['hindsight']['type'] == 'goal':
             self._execute_goal_policy(current_state_index, status, states, actions, rewards, workspace_image)
         elif self.config['hindsight']['type'] == 'future':
