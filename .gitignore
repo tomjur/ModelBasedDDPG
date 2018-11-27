@@ -2,8 +2,6 @@
 /models
 /tensorboard
 /_temp_scripts
-actor*.sh
-collector*.sh
 /important_models
 /supervised_data
 /vision_workspaces

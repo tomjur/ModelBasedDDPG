@@ -41,12 +41,6 @@ class QueryCollectorProcess(multiprocessing.Process):
                 self.result_queue.put(result)
 
     def run(self):
-        # write pid to file
-        collector_id = os.getpid()
-        collector_file = os.path.join(os.getcwd(), 'collector_{}.sh'.format(collector_id))
-        with open(collector_file, 'w') as f:
-            f.write('kill -9 {}'.format(collector_id))
-
         params_file = self.config['general']['params_file']
         workspace_params = None
         if params_file is not None:
@@ -176,12 +170,6 @@ class ActorProcess(multiprocessing.Process):
                 pass
 
     def run(self):
-        # write pid to file
-        actor_id = os.getpid()
-        actor_file = os.path.join(os.getcwd(), 'actor_{}.sh'.format(actor_id))
-        with open(actor_file, 'w') as f:
-            f.write('kill -9 {}'.format(actor_id))
-
         params_file = self.config['general']['params_file']
         workspace_params = None
         if params_file is not None:

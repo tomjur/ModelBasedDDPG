@@ -48,12 +48,6 @@ class ActorProcess(multiprocessing.Process):
                 pass
 
     def run(self):
-        # write pid to file
-        actor_id = os.getpid()
-        actor_file = os.path.join(os.getcwd(), 'actor_{}.sh'.format(actor_id))
-        with open(actor_file, 'w') as f:
-            f.write('kill -9 {}'.format(actor_id))
-
         workspace_params = WorkspaceParams.load_from_file('params_simple.pkl')
         self.openrave_interface = OpenraveRLInterface(self.config, workspace_params)
         self._run_main_loop()
