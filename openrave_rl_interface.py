@@ -199,7 +199,7 @@ class OpenraveRLInterface:
             difference_norm = np.linalg.norm(difference)
             if difference_norm < max_step:
                 # if smaller than allowed step just append the next step
-                res.append(trajectory[i + 1])
+                res.append(tuple(trajectory[i + 1]))
                 continue
             scaled_step = (max_step / difference_norm) * difference
             steps = []
