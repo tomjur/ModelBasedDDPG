@@ -230,6 +230,7 @@ def run_for_config(config, print_messages):
             rollout_manager.set_policy_weights(network.get_actor_online_weights(sess))
             episodes_per_update = config['general']['episodes_per_update']
             episode_results = rollout_manager.generate_episodes(episodes_per_update, True)
+            added_failed_trajectories = 0
             total_find_trajectory_time = None
             total_rollout_time = None
             for episode_result in episode_results:
@@ -249,8 +250,9 @@ def run_for_config(config, print_messages):
                     status, states, actions, rewards, goal_pose, goal_joints, workspace_image
                 )
                 # if the episode failed, and we want to use the motion planners trajectories, add to buffer:
-                if status != 3 and config['model']['use_motion_planner_trajectories_on_failure_cases']:
+                if status != 3 and added_failed_trajectories < config['model']['failed_motion_planner_trajectories']:
                     assert pre_trained_reward is not None
+                    added_failed_trajectories += 1
                     hindsight_policy.append_to_replay_buffer(*process_example_trajectory(
                         motion_planner_trajectory, motion_planner_trajectory_poses, goal_pose, goal_joints, workspace_image
                     ))

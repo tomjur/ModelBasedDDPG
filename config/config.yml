@@ -53,11 +53,12 @@ model:
   reward_model_name: '2018_11_25_10_22_02' # hard workspace with transition label
 #  reward_model_name: '2018_11_10_09_02_38' # hard workspace
 #  reward_model_name: '2018_10_31_10_44_31' # easy workspace
-  alter_episode: 0  # natural reward and original episode
+#  alter_episode: 0  # natural reward and original episode
 #  alter_episode: 1  # use learned reward with episode truncation
-#  alter_episode: 2  # use learned reward without episode truncation
-  use_motion_planner_trajectories_on_failure_cases: True
-#  use_motion_planner_trajectories_on_failure_cases: False
+  alter_episode: 2  # use learned reward without episode truncation
+#  failed_motion_planner_trajectories: 16
+  failed_motion_planner_trajectories: 2
+#  failed_motion_planner_trajectories: 0
 
 test:
   test_every_cycles: 50
