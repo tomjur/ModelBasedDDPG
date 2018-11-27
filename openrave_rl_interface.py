@@ -78,11 +78,11 @@ class OpenraveRLInterface:
                 self.max_planner_iterations -= self.planner_iterations_decrease
                 return self._split_trajectory(traj), start_joints, goal_joints
 
-    def start_new_random(self, allowed_start_goal_difference=None, return_traj=False):
+    def start_new_random(self, allowed_start_goal_difference=None, return_traj=False, return_image=True):
         traj, start_joints, goal_joints = self.find_random_trajectory(allowed_start_goal_difference)
-        return self.start_specific(traj, start_joints, goal_joints, return_traj=return_traj)
+        return self.start_specific(traj, start_joints, goal_joints, return_traj=return_traj, return_image=return_image)
 
-    def start_specific(self, traj, start_joints, goal_joints, return_traj=False):
+    def start_specific(self, traj, start_joints, goal_joints, return_traj=False, return_image=True):
         self.traj = traj
         # assert path is legal
         step_size = self.action_step_size + 0.00001
@@ -99,7 +99,7 @@ class OpenraveRLInterface:
         self.goal_joints = np.array(goal_joints)
         self.current_shaping_index = 0
         image = None
-        if self.workspace_params is not None:
+        if self.workspace_params is not None and return_image:
             image = self.workspace_params.get_image_as_numpy()
         # the agent gets the staring joints and the goal joints and the workspace image
         if return_traj:
