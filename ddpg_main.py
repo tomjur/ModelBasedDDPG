@@ -286,6 +286,7 @@ def run_for_config(config, print_messages):
 
             # test if needed
             if update_index % config['test']['test_every_cycles'] == 0:
+                rollout_manager.set_policy_weights(network.get_actor_online_weights(sess))
                 eval_result = trajectory_eval.eval(global_step, allowed_size)
                 test_episodes = eval_result[0]
                 test_successful_episodes = eval_result[1]
