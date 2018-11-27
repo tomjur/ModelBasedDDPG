@@ -33,7 +33,11 @@ class QueryCollectorProcess(multiprocessing.Process):
             except Queue.Empty:
                 pass
             if self.result_queue.qsize() < required_trajectories:
-                result = self.openrave_interface.find_random_trajectory()
+                trajectory, start_joints, goal_joints = self.openrave_interface.find_random_trajectory()
+                trajectory_poses = [
+                    self.openrave_interface.openrave_manager.get_potential_points_poses(step) for step in trajectory]
+                assert len(trajectory) == len(trajectory_poses)
+                result = trajectory, start_joints, goal_joints, trajectory_poses
                 self.result_queue.put(result)
 
     def run(self):
@@ -85,6 +89,7 @@ class ActorProcess(multiprocessing.Process):
         return joints, poses, jacobians
 
     def _run_episode(self, sess, query_params, is_train):
+        trajctory, start_joints, goal_joints, trajectory_poses = query_params
         # the trajectory data structures to return
         start_episode_time = datetime.datetime.now()
         states = []
@@ -92,7 +97,7 @@ class ActorProcess(multiprocessing.Process):
         rewards = []
         # start the new query
         current_joints, goal_joints, workspace_image, steps_required_for_motion_plan = \
-            self.openrave_interface.start_specific(*query_params)
+            self.openrave_interface.start_specific(trajctory, start_joints, goal_joints)
         goal_pose = self.openrave_interface.openrave_manager.get_target_pose(goal_joints)
         goal_joints = goal_joints[1:]
         # set the start state
@@ -134,7 +139,7 @@ class ActorProcess(multiprocessing.Process):
         find_trajectory_time = start_rollout_time - start_episode_time
         rollout_time = end_episode_time-start_rollout_time
         return status, states, actions, rewards, goal_pose, goal_joints, workspace_image, find_trajectory_time, \
-               rollout_time
+               rollout_time, trajctory, trajectory_poses
 
     def _run_main_loop(self, sess):
         while True:

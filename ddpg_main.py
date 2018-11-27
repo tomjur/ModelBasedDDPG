@@ -135,11 +135,11 @@ def run_for_config(config, print_messages):
         return result
 
     def alter_episode(status, states, actions, rewards, goal_pose, goal_joints, workspace_image, find_trajectory_time,
-                      rollout_time):
+                      rollout_time, motion_planner_trajectory, motion_planner_trajectory_poses):
         alter_episode_mode = config['model']['alter_episode']
         if alter_episode_mode == 0:
             return status, states, actions, rewards, goal_pose, goal_joints, workspace_image, find_trajectory_time, \
-                   rollout_time
+                   rollout_time, motion_planner_trajectory, motion_planner_trajectory_poses
         assert pre_trained_reward is not None
         # first unpack states:
         joints, poses, jacobians = unpack_state_batch(states)
@@ -155,7 +155,7 @@ def run_for_config(config, print_messages):
                 all_transition_labels=one_hot_status
             )[0]
             return status, states, actions, [r[0] for r in fake_rewards], goal_pose, goal_joints, workspace_image, \
-                   find_trajectory_time, rollout_time
+                   find_trajectory_time, rollout_time, motion_planner_trajectory, motion_planner_trajectory_poses
         if alter_episode_mode == 1:
             # get the maximal status for each transition (the indices are from 0-2 while the status are 1-3)
             fake_rewards, fake_status_prob = pre_trained_reward.make_prediction(
@@ -171,7 +171,7 @@ def run_for_config(config, print_messages):
             # truncated) and the goal parameters as-is.
             return fake_status[truncation_index], states[:truncation_index+2], actions[:truncation_index+1], \
                    [r[0] for r in fake_rewards[:truncation_index+1]], goal_pose, goal_joints, workspace_image, \
-                   find_trajectory_time, rollout_time
+                   find_trajectory_time, rollout_time, motion_planner_trajectory, motion_planner_trajectory_poses
 
     def print_state(prefix, episodes, successful_episodes, collision_episodes, max_len_episodes):
         if not print_messages:
@@ -181,6 +181,27 @@ def run_for_config(config, print_messages):
             successful_episodes, float(successful_episodes) / episodes, collision_episodes,
             float(collision_episodes) / episodes, max_len_episodes, float(max_len_episodes) / episodes
         )
+
+    def process_example_trajectory(
+            example_trajectory, example_trajectory_poses, goal_pose, goal_joints, workspace_image):
+        example_trajectory = [j[1:] for j in example_trajectory]
+        # goal reached always
+        status = 3
+        # get the states (joints, poses, jacobians), for now, ignore the jacobians.
+        states = [(example_trajectory[i], example_trajectory_poses[i], None) for i in range(len(example_trajectory))]
+        # compute the actions by normalized difference between steps
+        actions = [np.array(example_trajectory[i+1]) - np.array(example_trajectory[i])
+                   for i in range(len(example_trajectory)-1)]
+        actions = [a / max(np.linalg.norm(a), 0.00001) for a in actions]
+        # compute the rewards
+        one_hot_status = np.zeros((len(actions), 3), dtype=np.float32)
+        one_hot_status[:-1, 0] = 1.0
+        one_hot_status[-1, 2] = 1.0
+        fake_rewards = pre_trained_reward.make_prediction(
+            sess, example_trajectory[:-1], [goal_joints] * len(actions), actions, [goal_pose] * len(actions),
+            all_transition_labels=one_hot_status
+        )[0]
+        return status, states, actions, fake_rewards, goal_pose, goal_joints, workspace_image
 
     with tf.Session(
             config=tf.ConfigProto(
@@ -213,7 +234,8 @@ def run_for_config(config, print_messages):
             total_rollout_time = None
             for episode_result in episode_results:
                 # run episode:
-                status, states, actions, rewards, goal_pose, goal_joints, workspace_image, find_trajectory_time, rollout_time = alter_episode(*episode_result)
+                status, states, actions, rewards, goal_pose, goal_joints, workspace_image, find_trajectory_time, \
+                rollout_time, motion_planner_trajectory, motion_planner_trajectory_poses = alter_episode(*episode_result)
                 if total_find_trajectory_time is None:
                     total_find_trajectory_time = find_trajectory_time
                 else:
@@ -222,10 +244,16 @@ def run_for_config(config, print_messages):
                     total_rollout_time = rollout_time
                 else:
                     total_rollout_time += rollout_time
-                # at the end of episode
+                # at the end of episode, append to buffer
                 hindsight_policy.append_to_replay_buffer(
                     status, states, actions, rewards, goal_pose, goal_joints, workspace_image
                 )
+                # if the episode failed, and we want to use the motion planners trajectories, add to buffer:
+                if status != 3 and config['model']['use_motion_planner_trajectories_on_failure_cases']:
+                    assert pre_trained_reward is not None
+                    hindsight_policy.append_to_replay_buffer(*process_example_trajectory(
+                        motion_planner_trajectory, motion_planner_trajectory_poses, goal_pose, goal_joints, workspace_image
+                    ))
                 total_episodes += 1
                 episodes += 1
                 if status == 1:
