@@ -68,7 +68,9 @@ class PreTrainedReward:
 
         # predict the transition classification
         layers = self.config['reward']['layers'] + [3]
-        scale = self.config['reward']['l2_regularization_coefficient']
+        scale = 0.0
+        if 'l2_regularization_coefficient' in self.config['reward']:
+            scale = self.config['reward']['l2_regularization_coefficient']
         current = tf.concat((clipped_next_joints, self._generate_goal_features(goal_joints_inputs, goal_pose_inputs, workspace_image_inputs)), axis=1)
         for i, layer_size in enumerate(layers):
             _activation = None if i == len(layers) - 1 else get_activation(self.config['reward']['activation'])
