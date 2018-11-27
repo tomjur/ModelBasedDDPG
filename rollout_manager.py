@@ -1,4 +1,3 @@
-import os
 import copy
 import random
 import numpy as np
@@ -33,11 +32,11 @@ class QueryCollectorProcess(multiprocessing.Process):
             except Queue.Empty:
                 pass
             if self.result_queue.qsize() < required_trajectories:
-                trajectory, start_joints, goal_joints = self.openrave_interface.find_random_trajectory()
+                trajectory = self.openrave_interface.find_random_trajectory()
                 trajectory_poses = [
                     self.openrave_interface.openrave_manager.get_potential_points_poses(step) for step in trajectory]
                 assert len(trajectory) == len(trajectory_poses)
-                result = trajectory, start_joints, goal_joints, trajectory_poses
+                result = trajectory, trajectory_poses
                 self.result_queue.put(result)
 
     def run(self):
@@ -83,15 +82,15 @@ class ActorProcess(multiprocessing.Process):
         return joints, poses, jacobians
 
     def _run_episode(self, sess, query_params, is_train):
-        trajctory, start_joints, goal_joints, trajectory_poses = query_params
+        trajectory, trajectory_poses = query_params
         # the trajectory data structures to return
         start_episode_time = datetime.datetime.now()
         states = []
         actions = []
         rewards = []
         # start the new query
-        current_joints, goal_joints, workspace_image, steps_required_for_motion_plan = \
-            self.openrave_interface.start_specific(trajctory, start_joints, goal_joints)
+        current_joints, goal_joints, steps_required_for_motion_plan = self.openrave_interface.start_specific(
+            trajectory)
         goal_pose = self.openrave_interface.openrave_manager.get_target_pose(goal_joints)
         goal_joints = goal_joints[1:]
         # set the start state
@@ -104,14 +103,8 @@ class ActorProcess(multiprocessing.Process):
         max_steps = int(steps_required_for_motion_plan * self.config['general']['max_path_slack'])
         for j in range(max_steps):
             # do a single step prediction
-            # current_poses = None if current_state[1] is None else {
-            #     p.tuple: [current_state[1][p.tuple]] for p in self.actor.potential_points
-            # }
-            # current_jacobians = None if current_state[2] is None else {
-            #     p.tuple: [current_state[2][p.tuple]] for p in self.actor.potential_points
-            # }
             action_mean = self.actor.predict_action(
-                [current_state[0]], [workspace_image], [goal_pose], [goal_joints], sess, use_online_network=True
+                [current_state[0]], [None], [goal_pose], [goal_joints], sess, use_online_network=True
             )[0]
             sampled_action = self._get_sampled_action(action_mean) if is_train else action_mean
             # make an environment step
@@ -132,8 +125,9 @@ class ActorProcess(multiprocessing.Process):
         end_episode_time = datetime.datetime.now()
         find_trajectory_time = start_rollout_time - start_episode_time
         rollout_time = end_episode_time-start_rollout_time
+        workspace_image = None
         return status, states, actions, rewards, goal_pose, goal_joints, workspace_image, find_trajectory_time, \
-               rollout_time, trajctory, trajectory_poses
+               rollout_time, trajectory, trajectory_poses
 
     def _run_main_loop(self, sess):
         while True:

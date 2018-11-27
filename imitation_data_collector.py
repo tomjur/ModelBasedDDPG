@@ -1,11 +1,7 @@
-import os
 import copy
-import numpy as np
-import tensorflow as tf
 import multiprocessing
 import Queue
 
-from network import Network
 from openrave_rl_interface import OpenraveRLInterface
 from workspace_generation_utils import WorkspaceParams
 
@@ -21,12 +17,11 @@ class ActorProcess(multiprocessing.Process):
         self.openrave_interface = None
 
     def _get_tuple(self):
-        start_joints, goal_joints, image, _, trajectory = self.openrave_interface.start_new_random(
-            None, return_traj=True, return_image=False)
+        start_joints, goal_joints, _, trajectory = self.openrave_interface.start_new_random(None, return_traj=True)
         trajectory_poses = [
             self.openrave_interface.openrave_manager.get_potential_points_poses(step) for step in trajectory]
         goal_pose = self.openrave_interface.openrave_manager.get_target_pose(goal_joints)
-        return trajectory, image, goal_pose, trajectory_poses
+        return trajectory, goal_pose, trajectory_poses
 
     def _run_main_loop(self):
         while True:

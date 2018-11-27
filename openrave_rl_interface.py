@@ -75,14 +75,16 @@ class OpenraveRLInterface:
             elif self.max_planner_iterations > self.planner_iterations_start + self.planner_iterations_decrease:
                 # if plan was found, maybe we need less iterations
                 self.max_planner_iterations -= self.planner_iterations_decrease
-                return self._split_trajectory(traj), start_joints, goal_joints
+                return self._split_trajectory(traj)
 
-    def start_new_random(self, allowed_start_goal_difference=None, return_traj=False, return_image=True):
-        traj, start_joints, goal_joints = self.find_random_trajectory(allowed_start_goal_difference)
-        return self.start_specific(traj, start_joints, goal_joints, return_traj=return_traj, return_image=return_image)
+    def start_new_random(self, allowed_start_goal_difference=None, return_traj=False):
+        traj = self.find_random_trajectory(allowed_start_goal_difference)
+        return self.start_specific(traj, return_traj=return_traj)
 
-    def start_specific(self, traj, start_joints, goal_joints, return_traj=False, return_image=True):
+    def start_specific(self, traj, return_traj=False):
         self.traj = traj
+        start_joints = traj[0]
+        goal_joints = traj[-1]
         # assert path is legal
         step_size = self.action_step_size + 0.00001
         for i in range(len(traj)-1):
@@ -93,14 +95,11 @@ class OpenraveRLInterface:
         self.start_joints = np.array(start_joints)
         self.goal_joints = np.array(goal_joints)
         self.current_shaping_index = 0
-        image = None
-        if self.workspace_params is not None and return_image:
-            image = self.workspace_params.get_image_as_numpy()
         # the agent gets the staring joints and the goal joints and the workspace image
         if return_traj:
-            return start_joints, goal_joints, image, steps_required_for_motion_plan, traj
+            return start_joints, goal_joints, steps_required_for_motion_plan, traj
         else:
-            return start_joints, goal_joints, image, steps_required_for_motion_plan
+            return start_joints, goal_joints, steps_required_for_motion_plan
 
     @staticmethod
     def _is_valid_region(start_pose, goal_pose):
