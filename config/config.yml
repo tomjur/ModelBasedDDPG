@@ -14,6 +14,8 @@ general:
 #  collector_processes: 4
   actor_processes: 6
   collector_processes: 12
+#  actor_processes: 1
+#  collector_processes: 1
   write_train_summaries: 500
   save_model_every_cycles: 100
 #  params_file: # for no params
@@ -54,6 +56,8 @@ model:
   alter_episode: 0  # natural reward and original episode
 #  alter_episode: 1  # use learned reward with episode truncation
 #  alter_episode: 2  # use learned reward without episode truncation
+  use_motion_planner_trajectories_on_failure_cases: True
+#  use_motion_planner_trajectories_on_failure_cases: False
 
 test:
   test_every_cycles: 50
