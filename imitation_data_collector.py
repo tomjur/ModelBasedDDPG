@@ -7,12 +7,13 @@ from workspace_generation_utils import WorkspaceParams
 
 
 class ActorProcess(multiprocessing.Process):
-    def __init__(self, config, generate_data_queue, result_queue, actor_specific_queue):
+    def __init__(self, config, generate_data_queue, result_queue, actor_specific_queue, params_file=None):
         multiprocessing.Process.__init__(self)
         self.generate_data_queue = generate_data_queue
         self.result_queue = result_queue
         self.actor_specific_queue = actor_specific_queue
         self.config = config
+        self.params_file = params_file
         # members to set at runtime
         self.openrave_interface = None
 
@@ -43,13 +44,15 @@ class ActorProcess(multiprocessing.Process):
                 pass
 
     def run(self):
-        workspace_params = WorkspaceParams.load_from_file('params_simple.pkl')
+        workspace_params = None
+        if self.params_file is not None:
+            workspace_params = WorkspaceParams.load_from_file(self.params_file)
         self.openrave_interface = OpenraveRLInterface(self.config, workspace_params)
         self._run_main_loop()
 
 
 class ImitationDataCollector:
-    def __init__(self, config, number_of_threads, ):
+    def __init__(self, config, number_of_threads, params_file=None):
         self.number_of_threads = number_of_threads
         self.data_generation_queue = multiprocessing.JoinableQueue()
         self.results_queue = multiprocessing.Queue()
@@ -59,7 +62,8 @@ class ImitationDataCollector:
 
         self.actors = [
             ActorProcess(
-                copy.deepcopy(config), self.data_generation_queue, self.results_queue, self.actor_specific_queues[i]
+                copy.deepcopy(config), self.data_generation_queue, self.results_queue, self.actor_specific_queues[i],
+                params_file
             )
             for i in range(self.number_of_threads)
         ]

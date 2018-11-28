@@ -14,6 +14,9 @@ with open(config_path, 'r') as yml_file:
     print(yaml.dump(config))
 
 config['openrave_rl']['challenging_trajectories_only'] = True
+# params_file = None
+# params_file = 'params_simple.pkl'
+params_file = 'params_hard.pkl'
 
 # number_of_trajectories = 20
 # trajectories_per_file = 4
@@ -23,7 +26,7 @@ number_of_trajectories = 100000
 trajectories_per_file = 1000
 threads = 100
 
-data_collector = ImitationDataCollector(config, threads)
+data_collector = ImitationDataCollector(config, threads, params_file)
 results_dir = 'imitation_data'
 if not os.path.exists(results_dir):
     os.makedirs(results_dir)
