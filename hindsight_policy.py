@@ -11,8 +11,14 @@ class HindsightPolicy:
         # the following buffer saves the transition we are about to add
         self.augmented_buffer = []
 
-    def append_to_replay_buffer(self, status, states, actions, rewards, goal_pose, goal_joints, workspace_image):
+    def append_to_replay_buffer(self, episodes):
         self.augmented_buffer = []
+        for episode in episodes:
+            self._append_to_replay_buffer_single_episode(episode)
+        self._score_extra_data_and_add_to_buffer()
+
+    def _append_to_replay_buffer_single_episode(self, episode):
+        status, states, actions, rewards, goal_pose, goal_joints, workspace_image = episode
         for i in range(len(actions)):
             current_state = states[i]
             next_state = states[i+1]
@@ -25,7 +31,6 @@ class HindsightPolicy:
                 next_state
             )
             self._add_extra_data(i, status, states, actions, rewards, workspace_image)
-        self._score_extra_data_and_add_to_buffer()
 
     def _score_extra_data_and_add_to_buffer(self):
         if len(self.augmented_buffer) == 0:

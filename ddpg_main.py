@@ -209,8 +209,7 @@ def run_for_config(config, print_messages):
                     motion_planner_episodes, sess)
 
             # add to replay buffer
-            for episode in list(altered_episodes) + list(altered_motion_planner_episodes):
-                hindsight_policy.append_to_replay_buffer(*episode)
+            hindsight_policy.append_to_replay_buffer(list(altered_episodes) + list(altered_motion_planner_episodes))
 
             # compute times
             total_find_trajectory_time = None
