@@ -1,3 +1,5 @@
+import pickle
+import os
 import copy
 import random
 import numpy as np
@@ -11,7 +13,7 @@ from openrave_rl_interface import OpenraveRLInterface
 from workspace_generation_utils import WorkspaceParams
 
 
-class QueryCollectorProcess(multiprocessing.Process):
+class RandomQueryCollectorProcess(multiprocessing.Process):
     def __init__(self, config, result_queue, collector_specific_queue):
         multiprocessing.Process.__init__(self)
         self.result_queue = result_queue
@@ -46,6 +48,55 @@ class QueryCollectorProcess(multiprocessing.Process):
             workspace_params = WorkspaceParams.load_from_file(params_file)
         self.openrave_interface = OpenraveRLInterface(self.config, workspace_params)
         self._run_main_loop()
+
+
+class FixedQueryCollectorProcess(multiprocessing.Process):
+    def __init__(self, config, result_queue, collector_specific_queue, source_directory):
+        multiprocessing.Process.__init__(self)
+        self.result_queue = result_queue
+        self.collector_specific_queue = collector_specific_queue
+        self.config = config
+        self.source_directory = source_directory
+
+        self.source_files = []
+        for dirpath, dirnames, filenames in os.walk(self.source_directory):
+            for filename in filenames:
+                if filename.endswith('.path_pkl'):
+                    full_file_path = os.path.join(self.source_directory, filename)
+                    self.source_files.append(full_file_path)
+
+        self.current_files = []
+        self.current_trajectories = []
+
+    def run(self):
+        episodes_per_update = self.config['general']['episodes_per_update']
+        required_trajectories = episodes_per_update * 10
+
+        while True:
+            try:
+                next_collector_specific_task = self.collector_specific_queue.get(block=True, timeout=0.1)
+                task_type = next_collector_specific_task[0]
+                # can only terminate
+                self.collector_specific_queue.task_done()
+                break
+            except Queue.Empty:
+                pass
+            if self.result_queue.qsize() < required_trajectories:
+                result = self._get_next()
+                self.result_queue.put(result)
+
+    def _get_next(self):
+        if len(self.current_trajectories) == 0:
+            # needs to load a new file with trajectories
+            if len(self.current_files) == 0:
+                # needs to load all the files again (and shuffle)
+                self.current_files = copy.deepcopy(self.source_files)
+                random.shuffle(self.current_files)
+            trajectories_file = self.current_files.pop()
+            self.current_trajectories = pickle.load(open(trajectories_file))
+            random.shuffle(self.current_trajectories)
+        # return the first trajectory
+        return self.current_trajectories.pop()
 
 
 class ActorProcess(multiprocessing.Process):
@@ -202,7 +253,7 @@ class RolloutManager:
         self.actor_specific_queues = [multiprocessing.JoinableQueue() for _ in range(actor_processes)]
 
         self.collectors = [
-            QueryCollectorProcess(
+            RandomQueryCollectorProcess(
                 copy.deepcopy(config), self.query_results_queue, self.collector_specific_queue[i]
             )
             for i in range(collector_processes)
@@ -261,6 +312,82 @@ class RolloutManager:
         message = (1, )
         self._post_private_message(message, self.actor_specific_queues)
         self._post_private_message(message, self.collector_specific_queue)
+
+    @staticmethod
+    def _post_private_message(message, queues):
+        for queue in queues:
+            queue.put(message)
+        for queue in queues:
+            queue.join()
+            
+
+class FixedRolloutManager:
+    def __init__(self, config, actor_processes=None):
+        self.episode_generation_queue = multiprocessing.JoinableQueue()
+        self.episode_results_queue = multiprocessing.Queue()
+        self.train_query_results_queue = multiprocessing.Queue()
+        self.test_query_results_queue = multiprocessing.Queue()
+
+        if actor_processes is None:
+            actor_processes = config['general']['actor_processes']
+
+        self.train_collector_specific_queue = multiprocessing.JoinableQueue()
+        self.test_collector_specific_queue = multiprocessing.JoinableQueue()
+        self.actor_specific_queues = [multiprocessing.JoinableQueue() for _ in range(actor_processes)]
+
+        self.train_collector = FixedQueryCollectorProcess(
+            copy.deepcopy(config), self.train_query_results_queue, self.train_collector_specific_queue,
+            os.path.expanduser(config['general']['train_trajectory_directory'])
+        )
+        self.test_collector = FixedQueryCollectorProcess(
+            copy.deepcopy(config), self.test_query_results_queue, self.test_collector_specific_queue,
+            os.path.expanduser(config['general']['test_trajectory_directory'])
+        )
+
+        self.actors = [
+            ActorProcess(copy.deepcopy(config), self.episode_generation_queue, self.episode_results_queue,
+                         self.actor_specific_queues[i])
+            for i in range(actor_processes)
+        ]
+        # start all the collector processes
+        self.train_collector.start()
+        self.test_collector.start()
+
+        # start all the actor processes
+        for a in self.actors:
+            a.start()
+        # for every actor process, post a message to initialize the actor network
+        for actor_queue in self.actor_specific_queues:
+            actor_queue.put((0, ))
+            actor_queue.join()
+
+    def generate_episodes(self, number_of_episodes, is_train):
+        # use collectors to generate queries
+        for i in range(number_of_episodes):
+            # get a query
+            results_queue = self.train_query_results_queue if is_train else self.test_query_results_queue
+            query = results_queue.get()
+            message = (query, is_train)
+            # place in queue
+            self.episode_generation_queue.put(message)
+
+        self.episode_generation_queue.join()
+
+        episodes = []
+        while number_of_episodes:
+            number_of_episodes -= 1
+            episodes.append(self.episode_results_queue.get())
+
+        return episodes
+
+    def set_policy_weights(self, weights):
+        message = (2, weights)
+        self._post_private_message(message, self.actor_specific_queues)
+
+    def end(self):
+        message = (1, )
+        self._post_private_message(message, self.actor_specific_queues)
+        self._post_private_message(message, [self.train_collector_specific_queue, self.test_collector_specific_queue])
 
     @staticmethod
     def _post_private_message(message, queues):

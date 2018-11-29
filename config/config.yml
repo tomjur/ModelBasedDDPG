@@ -11,11 +11,10 @@ general:
   gpu_usage: 0.01
   actor_gpu_usage: 0.01
 #  actor_processes: 2
-#  collector_processes: 4
   actor_processes: 6
-  collector_processes: 12
 #  actor_processes: 1
-#  collector_processes: 1
+  train_trajectory_directory: '~/ModelBasedDDPG/imitation_data/train'
+  test_trajectory_directory: '~/ModelBasedDDPG/imitation_data/test'
   write_train_summaries: 500
   save_model_every_cycles: 100
 #  params_file: # for no params

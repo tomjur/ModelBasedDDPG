@@ -11,7 +11,7 @@ from episode_editor import EpisodeEditor
 from hindsight_policy import HindsightPolicy
 from network import Network
 from replay_buffer import ReplayBuffer
-from rollout_manager import RolloutManager
+from rollout_manager import FixedRolloutManager
 from summaries_collector import SummariesCollector
 from trajectory_eval import TrajectoryEval
 from pre_trained_reward import PreTrainedReward
@@ -83,7 +83,7 @@ def run_for_config(config, print_messages):
     yaml.dump(config, open(config_copy_path, 'w'))
     summaries_collector = SummariesCollector(summaries_dir, model_name)
     curriculum_manager = CurriculumManager(config, print_messages)
-    rollout_manager = RolloutManager(config)
+    rollout_manager = FixedRolloutManager(config)
 
     test_results = []
 
