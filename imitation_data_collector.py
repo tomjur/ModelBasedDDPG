@@ -1,38 +1,31 @@
 import copy
 import multiprocessing
 import Queue
+import time
 
 from openrave_rl_interface import OpenraveRLInterface
 from workspace_generation_utils import WorkspaceParams
 
 
 class ActorProcess(multiprocessing.Process):
-    def __init__(self, config, generate_data_queue, result_queue, actor_specific_queue, params_file=None):
+    def __init__(self, config, required_trajectories, result_queue, actor_specific_queue, params_file=None):
         multiprocessing.Process.__init__(self)
-        self.generate_data_queue = generate_data_queue
         self.result_queue = result_queue
         self.actor_specific_queue = actor_specific_queue
         self.config = config
         self.params_file = params_file
         # members to set at runtime
         self.openrave_interface = None
+        self.required_trajectories = required_trajectories
 
     def _get_tuple(self):
         start_joints, goal_joints, _, trajectory = self.openrave_interface.start_new_random(None, return_traj=True)
         trajectory_poses = [
             self.openrave_interface.openrave_manager.get_potential_points_poses(step) for step in trajectory]
-        goal_pose = self.openrave_interface.openrave_manager.get_target_pose(goal_joints)
-        return trajectory, goal_pose, trajectory_poses
+        return trajectory, trajectory_poses
 
     def _run_main_loop(self):
         while True:
-            try:
-                # wait 1 second for a trajectory request
-                _ = self.generate_data_queue.get(block=True, timeout=1)
-                self.result_queue.put(self._get_tuple())
-                self.generate_data_queue.task_done()
-            except Queue.Empty:
-                pass
             try:
                 next_actor_specific_task = self.actor_specific_queue.get(block=True, timeout=0.001)
                 task_type = next_actor_specific_task[0]
@@ -42,6 +35,8 @@ class ActorProcess(multiprocessing.Process):
                     break
             except Queue.Empty:
                 pass
+            if self.result_queue.qsize() < self.required_trajectories:
+                self.result_queue.put(self._get_tuple())
 
     def run(self):
         workspace_params = None
@@ -54,7 +49,6 @@ class ActorProcess(multiprocessing.Process):
 class ImitationDataCollector:
     def __init__(self, config, number_of_threads, params_file=None):
         self.number_of_threads = number_of_threads
-        self.data_generation_queue = multiprocessing.JoinableQueue()
         self.results_queue = multiprocessing.Queue()
         self.actor_specific_queues = [
             multiprocessing.JoinableQueue() for _ in range(self.number_of_threads)
@@ -62,7 +56,7 @@ class ImitationDataCollector:
 
         self.actors = [
             ActorProcess(
-                copy.deepcopy(config), self.data_generation_queue, self.results_queue, self.actor_specific_queues[i],
+                copy.deepcopy(config), self.number_of_threads*2, self.results_queue, self.actor_specific_queues[i],
                 params_file
             )
             for i in range(self.number_of_threads)
@@ -72,12 +66,6 @@ class ImitationDataCollector:
             a.start()
 
     def generate_samples(self, number_of_samples):
-        # place in queue
-        for i in range(number_of_samples):
-            self.data_generation_queue.put(i)
-
-        self.data_generation_queue.join()
-
         result_buffer = []
         while number_of_samples:
             number_of_samples -= 1
@@ -88,6 +76,7 @@ class ImitationDataCollector:
     def end(self):
         message = (1, )
         self._post_private_message(message)
+        time.sleep(10)
 
     def _post_private_message(self, message):
         for actor_queue in self.actor_specific_queues:

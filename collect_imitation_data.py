@@ -1,4 +1,5 @@
-import pickle
+import cPickle as pickle
+import bz2
 import os
 import yaml
 import datetime
@@ -18,7 +19,7 @@ config['openrave_rl']['challenging_trajectories_only'] = True
 # params_file = 'params_simple.pkl'
 params_file = 'params_hard.pkl'
 
-# number_of_trajectories = 20
+# number_of_trajectories = 8
 # trajectories_per_file = 4
 # threads = 2
 
@@ -36,8 +37,10 @@ while collected < number_of_trajectories:
     current_buffer = data_collector.generate_samples(trajectories_per_file)
     b = datetime.datetime.now()
     print 'data collection took: {}'.format(b - a)
-    dump_path = os.path.join(results_dir, 'temp_data_{}.pkl'.format(collected))
-    pickle.dump(current_buffer, open(dump_path, 'w'))
+    dump_path = os.path.join(results_dir, 'temp_data_{}.path_pkl'.format(collected))
+    compressed_file = bz2.BZ2File(dump_path, 'w')
+    pickle.dump(current_buffer, compressed_file)
+    compressed_file.close()
     collected += len(current_buffer)
 data_collector.end()
 

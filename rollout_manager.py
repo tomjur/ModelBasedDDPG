@@ -1,7 +1,8 @@
-import pickle
+import cPickle as pickle
 import os
 import copy
 import random
+import bz2
 import numpy as np
 import tensorflow as tf
 import multiprocessing
@@ -93,7 +94,9 @@ class FixedQueryCollectorProcess(multiprocessing.Process):
                 self.current_files = copy.deepcopy(self.source_files)
                 random.shuffle(self.current_files)
             trajectories_file = self.current_files.pop()
-            self.current_trajectories = pickle.load(open(trajectories_file))
+            compressed_file = bz2.BZ2File(trajectories_file, 'r')
+            self.current_trajectories = pickle.load(compressed_file)
+            compressed_file.close()
             random.shuffle(self.current_trajectories)
         # return the first trajectory
         return self.current_trajectories.pop()
