@@ -104,7 +104,7 @@ def run_for_config(config, print_messages):
         )
 
         # compute critic label
-        q_label = np.expand_dims(np.array(reward) + np.multiply(
+        q_label = np.expand_dims(np.squeeze(np.array(reward)) + np.multiply(
             np.multiply(1 - np.array(terminated), gamma),
             np.squeeze(next_state_action_target_q)
         ), 1)
