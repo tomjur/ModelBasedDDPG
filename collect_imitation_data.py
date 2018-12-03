@@ -4,7 +4,24 @@ import os
 import yaml
 import datetime
 
-from imitation_data_collector import ImitationDataCollector
+from data_collector import CollectorProcess, DataCollector
+
+
+class TrajectoryCollectorProcess(CollectorProcess):
+    def _get_tuple(self):
+        start_joints, goal_joints, _, trajectory = self.openrave_interface.start_new_random(None, return_traj=True)
+        trajectory_poses = [
+            self.openrave_interface.openrave_manager.get_potential_points_poses(step) for step in trajectory]
+        return trajectory, trajectory_poses
+
+
+class ImitationDataCollector(DataCollector):
+    def _get_queue_size(self, number_of_threads):
+        return 2 * number_of_threads
+
+    def _get_collector(self, config, queued_data_points, result_queue, collector_specific_queue, params_file=None):
+        return TrajectoryCollectorProcess(
+            config, queued_data_points, result_queue, collector_specific_queue, params_file)
 
 
 # read the config
@@ -19,16 +36,17 @@ config['openrave_rl']['challenging_trajectories_only'] = True
 # params_file = 'params_simple.pkl'
 params_file = 'params_hard.pkl'
 
-# number_of_trajectories = 8
-# trajectories_per_file = 4
-# threads = 2
+number_of_trajectories = 8
+trajectories_per_file = 4
+threads = 2
+results_dir = 'imitation_data_to_delete'
 
-number_of_trajectories = 100000
-trajectories_per_file = 1000
-threads = 100
+# number_of_trajectories = 100000
+# trajectories_per_file = 1000
+# threads = 100
+# results_dir = 'imitation_data'
 
 data_collector = ImitationDataCollector(config, threads, params_file)
-results_dir = 'imitation_data'
 if not os.path.exists(results_dir):
     os.makedirs(results_dir)
 collected = 0
@@ -43,6 +61,3 @@ while collected < number_of_trajectories:
     compressed_file.close()
     collected += len(current_buffer)
 data_collector.end()
-
-
-
