@@ -1,0 +1,46 @@
+=================================================================================================================
+install tf gpu my version
+# Update apt-get
+sudo apt-get update
+
+# Install apt-get deps
+sudo apt-get install openjdk-8-jdk git python-dev python3-dev python-numpy python3-numpy build-essential python-pip python3-pip python-virtualenv swig python-wheel libcurl3-dev
+
+# Install the The 16.04 installer works with 16.10.
+wget http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/cuda-repo-ubuntu1604_9.0.176-1_amd64.deb
+sudo dpkg -i cuda-repo-ubuntu1604_9.0.176-1_amd64.deb
+sudo apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/7fa2af80.pub
+sudo apt-get update
+sudo apt-get install cuda=9.0.176-1 -y
+
+# reboot Ubuntu
+sudo reboot
+
+wget 'https://developer.nvidia.com/compute/cuda/9.0/Prod/local_installers/cuda_9.0.176_384.81_linux-run' -O cuda-run
+
+sudo sh cuda-run
+
+press 's' to skip the license. don't install nvidia accelerated graphics
+
+wget https://s3.amazonaws.com/open-source-william-falcon/cudnn-9.0-linux-x64-v7.1.tgz 
+sudo tar -xzvf cudnn-9.0-linux-x64-v7.1.tgz
+sudo cp cuda/include/cudnn.h /usr/local/cuda/include
+sudo cp cuda/lib64/libcudnn* /usr/local/cuda/lib64
+sudo chmod a+r /usr/local/cuda/include/cudnn.h /usr/local/cuda/lib64/libcudnn*
+
+echo export PATH=/usr/local/cuda-9.0/bin${PATH:+:${PATH}} >> ~/.bashrc
+echo export LD_LIBRARY_PATH=/usr/local/cuda-9.0/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}} >> ~/.bashrc
+echo export CUDA_HOME=/usr/local/cuda >> ~/.bashrc
+
+source ~/.bashrc
+
+check cuda toolkit version
+nvcc --version
+
+check cudnn version
+cat /usr/local/cuda/include/cudnn.h | grep CUDNN_MAJOR -A 2
+
+sudo pip install --upgrade tensorflow-gpu==1.8
+
+make gpu not be 100%:
+sudo nvidia-smi -pm 1
