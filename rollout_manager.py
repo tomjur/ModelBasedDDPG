@@ -104,12 +104,13 @@ class FixedQueryCollectorProcess(multiprocessing.Process):
 
 
 class ActorProcess(multiprocessing.Process):
-    def __init__(self, config, generate_episode_queue, result_queue, actor_specific_queue):
+    def __init__(self, config, generate_episode_queue, result_queue, actor_specific_queue, image_cache=None):
         multiprocessing.Process.__init__(self)
         self.generate_episode_queue = generate_episode_queue
         self.result_queue = result_queue
         self.actor_specific_queue = actor_specific_queue
         self.config = config
+        self.image_cache = image_cache
         # members to set at runtime
         self.openrave_interface = None
         self.actor = None
@@ -137,7 +138,15 @@ class ActorProcess(multiprocessing.Process):
         return joints, poses, jacobians
 
     def _run_episode(self, sess, query_params, is_train):
-        trajectory, trajectory_poses = query_params
+        trajectory = query_params[0]
+        trajectory_poses = query_params[1]
+        if len(query_params) > 2:
+            # if we are doing multiple workspaces needs to load the correct one from the cache
+            self.openrave_interface.openrave_manager.remove_objects()
+            workspace_params_file = query_params[2]
+            params = self.image_cache.params[workspace_params_file]
+            self.openrave_interface.openrave_manager.load_params(params)
+
         # the trajectory data structures to return
         start_episode_time = datetime.datetime.now()
         states = []
@@ -223,17 +232,13 @@ class ActorProcess(multiprocessing.Process):
                 pass
 
     def run(self):
-        params_file = self.config['general']['params_file']
+        params_file = os.path.abspath(os.path.expanduser(self.config['general']['params_file']))
         workspace_params = None
-        if params_file is not None:
-            workspace_params = WorkspaceParams.load_from_file(params_file)
+        if not os.path.isdir(params_file):
+            if params_file is not None:
+                # we have a single params file - just load it
+                workspace_params = WorkspaceParams.load_from_file(params_file)
         self.openrave_interface = OpenraveRLInterface(self.config, workspace_params)
-
-        # config = tf.ConfigProto(
-        #     device_count = {'GPU': 0}
-        # )
-        # self.session = tf.Session(config=config)
-        # self.session.run(tf.initialize_all_variables())
 
         with tf.Session(
                 config=tf.ConfigProto(
@@ -327,7 +332,7 @@ class RolloutManager:
             
 
 class FixedRolloutManager:
-    def __init__(self, config, actor_processes=None):
+    def __init__(self, config, actor_processes=None, image_cache=None):
         self.episode_generation_queue = multiprocessing.JoinableQueue()
         self.episode_results_queue = multiprocessing.Queue()
         self.train_query_results_queue = multiprocessing.Queue()
@@ -351,11 +356,12 @@ class FixedRolloutManager:
         self.test_collector = FixedQueryCollectorProcess(
             copy.deepcopy(config), self.test_query_results_queue, self.test_collector_specific_queue,
             os.path.expanduser(os.path.join(base_dir, 'test'))
+
         )
 
         self.actors = [
             ActorProcess(copy.deepcopy(config), self.episode_generation_queue, self.episode_results_queue,
-                         self.actor_specific_queues[i])
+                         self.actor_specific_queues[i], image_cache)
             for i in range(actor_processes)
         ]
         # start all the collector processes

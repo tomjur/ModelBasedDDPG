@@ -6,6 +6,7 @@ import os
 import tensorflow as tf
 import tensorflow.contrib.layers as tf_layers
 
+from dqn_model import DqnModel
 from modeling_utils import get_activation
 from openrave_manager import OpenraveManager
 from potential_point import PotentialPoint
@@ -21,6 +22,8 @@ class PreTrainedReward:
         self.goal_joints_inputs = tf.placeholder(tf.float32, (None, 4), name='goal_joints_inputs')
         self.workspace_image_inputs = None
         self.goal_pose_inputs = tf.placeholder(tf.float32, (None, 2), name='goal_pose_inputs')
+        if config['model']['consider_image']:
+            self.workspace_image_inputs = tf.placeholder(tf.float32, (None, 111, 55, 1), name='image_inputs')
         self.action_inputs = tf.placeholder(tf.float32, (None, 4), name='action_inputs')
         self.transition_label = tf.placeholder_with_default([[0.0]*3], (None, 3), name='labeled_transition')
         current_variables_count = len(tf.trainable_variables())
@@ -37,7 +40,7 @@ class PreTrainedReward:
         self.saver = tf.train.Saver(reward_variables, max_to_keep=4, save_relative_paths=self.saver_dir)
 
     @staticmethod
-    def _generate_goal_features(goal_joints_inputs, goal_pose_inputs, workspace_image_inputs):
+    def _generate_goal_features(goal_joints_inputs, goal_pose_inputs):
         features = [goal_joints_inputs]
         if goal_pose_inputs is not None:
             features.append(goal_pose_inputs)
@@ -70,7 +73,12 @@ class PreTrainedReward:
         scale = 0.0
         if 'l2_regularization_coefficient' in self.config['reward']:
             scale = self.config['reward']['l2_regularization_coefficient']
-        current = tf.concat((clipped_next_joints, self._generate_goal_features(goal_joints_inputs, goal_pose_inputs, workspace_image_inputs)), axis=1)
+        current = tf.concat(
+            (clipped_next_joints, self._generate_goal_features(goal_joints_inputs, goal_pose_inputs)), axis=1)
+        # add vision if needed
+        if self.workspace_image_inputs is not None:
+            visual_inputs = DqnModel.predict(self.workspace_image_inputs)
+            current = tf.concat((current, visual_inputs), axis=1)
         for i, layer_size in enumerate(layers):
             _activation = None if i == len(layers) - 1 else get_activation(self.config['reward']['activation'])
             current = tf.layers.dense(
@@ -107,13 +115,14 @@ class PreTrainedReward:
     def load_weights(self, sess):
         self.saver.restore(sess, tf.train.latest_checkpoint(self.saver_dir))
 
-    def make_prediction(
-            self, sess, all_start_joints, all_goal_joints, all_actions, all_goal_poses, all_transition_labels=None
-    ):
-        feed = self.make_feed(all_start_joints, all_goal_joints, all_actions, all_goal_poses, all_transition_labels)
+    def make_prediction(self, sess, all_start_joints, all_goal_joints, all_actions, all_goal_poses,
+                        all_transition_labels=None, images=None):
+        feed = self.make_feed(all_start_joints, all_goal_joints, all_actions, all_goal_poses, all_transition_labels,
+                              images)
         return sess.run([self.reward_prediction, self.status_softmax_logits], feed)
 
-    def make_feed(self, all_start_joints, all_goal_joints, all_actions, all_goal_poses, all_transition_labels=None):
+    def make_feed(self, all_start_joints, all_goal_joints, all_actions, all_goal_poses, all_transition_labels=None,
+                  images=None):
         feed = {
             self.joints_inputs: all_start_joints,
             self.goal_joints_inputs: all_goal_joints,
@@ -121,6 +130,8 @@ class PreTrainedReward:
         }
         if self.goal_pose_inputs is not None:
             feed[self.goal_pose_inputs] = all_goal_poses
+        if self.workspace_image_inputs is not None:
+            feed[self.workspace_image_inputs] = images
         if all_transition_labels is not None:
             feed[self.transition_label] = all_transition_labels
         return feed

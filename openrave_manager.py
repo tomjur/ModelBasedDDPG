@@ -51,6 +51,12 @@ class OpenraveManager(object):
                 body.SetTransform(transformation_matrix)
                 self.objects.append(body)
 
+    def remove_objects(self):
+        with self.env:
+            while len(self.objects):
+                body = self.objects.pop()
+                self.env.Remove(body)
+
     def get_number_of_joints(self):
         return self.robot.GetDOF()
 
