@@ -1,3 +1,4 @@
+import bz2
 import numpy as np
 import random
 import pickle
@@ -131,14 +132,14 @@ def oversample_batch(data_collection, data_index, batch_size, oversample_large_m
     current_batch = data_collection[data_index:data_index + batch_size]
     if not oversample_large_magnitude:
         return current_batch
-    rewards = [b[5] for b in current_batch]
-    success_reward_indices = [i for i, r in enumerate(rewards) if r > 0.8]
+    status = [b[-1] for b in current_batch]
+    success_reward_indices = [i for i, s in enumerate(status) if s == 3]
     if len(success_reward_indices) < 3:
         return None
-    collision_reward_indices = [i for i, r in enumerate(rewards) if r < -0.8]
+    collision_reward_indices = [i for i, s in enumerate(status) if s == 2]
     if len(collision_reward_indices) < 3:
         return None
-    other_reward_indices = [i for i, r in enumerate(rewards) if np.abs(r) <= 0.8]
+    other_reward_indices = [i for i, s in enumerate(status) if s == 1]
     assert len(success_reward_indices) + len(collision_reward_indices) + len(other_reward_indices) == len(current_batch)
     sample_size = len(other_reward_indices)
     batch_indices = other_reward_indices
@@ -159,7 +160,7 @@ def get_batch_and_labels(batch, openrave_manager):
     all_goal_poses = []
     all_status = []
     for i in range(len(batch)):
-        start_joints, goal_joints, image, action, next_joints, reward, terminated, status = batch[i]
+        start_joints, goal_joints, action, next_joints, reward, terminated, status = batch[i]
         goal_pose = openrave_manager.get_target_pose(goal_joints)
         all_start_joints.append(start_joints[1:])
         all_goal_joints.append(goal_joints[1:])
@@ -208,7 +209,9 @@ def load_data_from(data_dir, max_read=None):
     for file in files:
         if max_read is not None and len(total_buffer) > max_read:
             break
-        current_buffer = pickle.load(open(os.path.join(data_dir, file)))
+        compressed_file = bz2.BZ2File(os.path.join(data_dir, file), 'r')
+        current_buffer = pickle.load(compressed_file)
+        compressed_file.close()
         total_buffer.extend(current_buffer)
     return total_buffer
 

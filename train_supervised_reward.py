@@ -32,10 +32,27 @@ learn_rate_decrease_rate = config['reward']['learn_rate_decrease_rate']
 
 test_batch_size = batch_size * 10
 
-# train = load_data_from(os.path.join('supervised_data', 'train'), 2000)
-# test = load_data_from(os.path.join('supervised_data', 'test'), 2000)
+# train = load_data_from(os.path.join('supervised_data', 'train'), 100000)
+# test = load_data_from(os.path.join('supervised_data', 'test'), 100000)
 train = load_data_from(os.path.join('supervised_data', 'train'))
 test = load_data_from(os.path.join('supervised_data', 'test'))
+
+
+def describe_data(data_collection):
+    data_status = [t[-1] for t in data_collection]
+    free_status = len([s for s in data_status if s == 1])
+    collision_status = len([s for s in data_status if s == 2])
+    goal_status = len([s for s in data_status if s == 3])
+    print 'free: {} ({})'.format(free_status, float(free_status)/len(data_collection))
+    print 'collision: {} ({})'.format(collision_status, float(collision_status)/len(data_collection))
+    print 'goal: {} ({})'.format(goal_status, float(goal_status)/len(data_collection))
+    print ''
+
+
+print 'train description'
+describe_data(train)
+print 'test description'
+describe_data(test)
 
 # get openrave manager
 openrave_manager = OpenraveManager(0.001, PotentialPoint.from_config(config))
@@ -131,6 +148,7 @@ with tf.Session(
         )
 ) as sess:
     sess.run(tf.global_variables_initializer())
+    current_global_step = 0
     for epoch in range(epochs):
         # run train for one epoch
         random.shuffle(train)
@@ -156,32 +174,33 @@ with tf.Session(
             train_summary_writer.add_summary(train_summary, current_global_step)
         train_summary_writer.flush()
 
-        # run test for one (random) batch
-        random.shuffle(test)
-        test_batch = oversample_batch(test, 0, test_batch_size, oversample_large_magnitude=False)
-        test_batch, test_rewards, test_status = get_batch_and_labels(test_batch, openrave_manager)
-        test_feed = pre_trained_reward.make_feed(*test_batch)
-        test_feed[reward_input] = np.expand_dims(np.array(test_rewards), axis=1)
-        test_feed[status_input] = np.array(test_status)
-        test_reward_prediction, test_status_prediction, test_total_loss, test_summary = sess.run(
-            [reward_prediction, status_prediction, total_loss, test_optimization_summaries], test_feed)
-        test_summary_writer.add_summary(test_summary, current_global_step)
-        # see what happens for different reward classes:
-        goal_stats, collision_stats, other_stats = compute_stats_per_class(
-            test_status, test_rewards, test_status_prediction, test_reward_prediction)
-        test_summary_writer.add_summary(sess.run(test_summaries, {
-            goal_mean_rewards_error_input: goal_stats[0],
-            collision_mean_rewards_error_input: collision_stats[0],
-            other_mean_rewards_error_input: other_stats[0],
-            goal_max_rewards_error_input: goal_stats[1],
-            collision_max_rewards_error_input: collision_stats[1],
-            other_max_rewards_error_input: other_stats[1],
-            goal_accuracy_input: goal_stats[2],
-            collision_accuracy_input: collision_stats[2],
-            other_accuracy_input: other_stats[2],
-        }), current_global_step)
-        test_summary_writer.flush()
-        # save the model
-        if epoch % save_every_epochs == save_every_epochs-1:
-            pre_trained_reward.saver.save(sess, os.path.join(saver_dir, 'reward'), global_step=current_global_step)
-        print 'done epoch {} of {}'.format(epoch, epochs)
+        if current_global_step > 0:
+            # run test for one (random) batch
+            random.shuffle(test)
+            test_batch = oversample_batch(test, 0, test_batch_size, oversample_large_magnitude=False)
+            test_batch, test_rewards, test_status = get_batch_and_labels(test_batch, openrave_manager)
+            test_feed = pre_trained_reward.make_feed(*test_batch)
+            test_feed[reward_input] = np.expand_dims(np.array(test_rewards), axis=1)
+            test_feed[status_input] = np.array(test_status)
+            test_reward_prediction, test_status_prediction, test_total_loss, test_summary = sess.run(
+                [reward_prediction, status_prediction, total_loss, test_optimization_summaries], test_feed)
+            test_summary_writer.add_summary(test_summary, current_global_step)
+            # see what happens for different reward classes:
+            goal_stats, collision_stats, other_stats = compute_stats_per_class(
+                test_status, test_rewards, test_status_prediction, test_reward_prediction)
+            test_summary_writer.add_summary(sess.run(test_summaries, {
+                goal_mean_rewards_error_input: goal_stats[0],
+                collision_mean_rewards_error_input: collision_stats[0],
+                other_mean_rewards_error_input: other_stats[0],
+                goal_max_rewards_error_input: goal_stats[1],
+                collision_max_rewards_error_input: collision_stats[1],
+                other_max_rewards_error_input: other_stats[1],
+                goal_accuracy_input: goal_stats[2],
+                collision_accuracy_input: collision_stats[2],
+                other_accuracy_input: other_stats[2],
+            }), current_global_step)
+            test_summary_writer.flush()
+            # save the model
+            if epoch % save_every_epochs == save_every_epochs-1:
+                pre_trained_reward.saver.save(sess, os.path.join(saver_dir, 'reward'), global_step=current_global_step)
+        print 'done epoch {} of {}, global step {}'.format(epoch, epochs, current_global_step)
