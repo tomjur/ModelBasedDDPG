@@ -338,13 +338,15 @@ class FixedRolloutManager:
         self.test_collector_specific_queue = multiprocessing.JoinableQueue()
         self.actor_specific_queues = [multiprocessing.JoinableQueue() for _ in range(actor_processes)]
 
+        base_dir = config['general']['trajectory_directory']
+
         self.train_collector = FixedQueryCollectorProcess(
             copy.deepcopy(config), self.train_query_results_queue, self.train_collector_specific_queue,
-            os.path.expanduser(config['general']['train_trajectory_directory'])
+            os.path.expanduser(os.path.join(base_dir, 'train'))
         )
         self.test_collector = FixedQueryCollectorProcess(
             copy.deepcopy(config), self.test_query_results_queue, self.test_collector_specific_queue,
-            os.path.expanduser(config['general']['test_trajectory_directory'])
+            os.path.expanduser(os.path.join(base_dir, 'test'))
         )
 
         self.actors = [
