@@ -13,8 +13,7 @@ general:
 #  actor_processes: 2
   actor_processes: 6
 #  actor_processes: 1
-  train_trajectory_directory: '~/ModelBasedDDPG/imitation_data/train'
-  test_trajectory_directory: '~/ModelBasedDDPG/imitation_data/test'
+  trajectory_directory: '~/ModelBasedDDPG/imitation_data/hard_workspace_hard_paths/'
   write_train_summaries: 500
   save_model_every_cycles: 100
 #  params_file: # for no params
@@ -51,11 +50,10 @@ model:
   reward_model_name: '2018_11_25_10_22_02' # hard workspace with transition label
 #  reward_model_name: '2018_11_10_09_02_38' # hard workspace
 #  reward_model_name: '2018_10_31_10_44_31' # easy workspace
-  alter_episode: 0  # natural reward and original episode
+#  alter_episode: 0  # natural reward and original episode
 #  alter_episode: 1  # use learned reward with episode truncation
-#  alter_episode: 2  # use learned reward without episode truncation
-#  failed_motion_planner_trajectories: 16
-  failed_motion_planner_trajectories: 1
+  alter_episode: 2  # use learned reward without episode truncation
+  failed_motion_planner_trajectories: 16
 #  failed_motion_planner_trajectories: 0
 
 test:
@@ -63,8 +61,8 @@ test:
   number_of_episodes: 50
 
 hindsight:
-#  enable: False
-  enable: True
+  enable: False
+#  enable: True
 #  type: 'goal'
   type: 'future'
   k: 4
