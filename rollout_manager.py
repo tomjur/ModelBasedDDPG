@@ -8,6 +8,7 @@ import tensorflow as tf
 import multiprocessing
 import Queue
 import datetime
+import time
 
 from network import Network
 from openrave_rl_interface import OpenraveRLInterface
@@ -393,6 +394,12 @@ class FixedRolloutManager:
         message = (1, )
         self._post_private_message(message, self.actor_specific_queues)
         self._post_private_message(message, [self.train_collector_specific_queue, self.test_collector_specific_queue])
+        time.sleep(10)
+        for a in self.actors:
+            a.terminate()
+        self.train_collector.terminate()
+        self.test_collector.terminate()
+        time.sleep(10)
 
     @staticmethod
     def _post_private_message(message, queues):
