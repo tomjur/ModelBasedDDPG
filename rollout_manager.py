@@ -334,6 +334,8 @@ class FixedRolloutManager:
 
         if actor_processes is None:
             actor_processes = config['general']['actor_processes']
+            if actor_processes is None:
+                actor_processes = multiprocessing.cpu_count()
 
         self.train_collector_specific_queue = multiprocessing.JoinableQueue()
         self.test_collector_specific_queue = multiprocessing.JoinableQueue()

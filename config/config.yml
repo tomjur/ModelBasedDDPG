@@ -10,8 +10,8 @@ general:
   max_path_slack: 1.5
   gpu_usage: 0.01
   actor_gpu_usage: 0.01
-#  actor_processes: 2
-  actor_processes: 6
+#  actor_processes: 6
+  actor_processes:
 #  actor_processes: 1
   trajectory_directory: '~/ModelBasedDDPG/imitation_data/hard_workspace_hard_paths/'
   write_train_summaries: 500
@@ -53,7 +53,7 @@ model:
 #  alter_episode: 0  # natural reward and original episode
 #  alter_episode: 1  # use learned reward with episode truncation
   alter_episode: 2  # use learned reward without episode truncation
-  failed_motion_planner_trajectories: 16
+  failed_motion_planner_trajectories: 8
 #  failed_motion_planner_trajectories: 0
 
 test:
