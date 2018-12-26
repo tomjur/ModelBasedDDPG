@@ -44,17 +44,22 @@ with open(config_path, 'r') as yml_file:
 
 config['openrave_rl']['challenging_trajectories_only'] = False
 
-number_of_samples = 1000
-samples_per_file = 100
-threads = 2
-results_dir = 'supervised_data_temp_to_delete'
+# number_of_samples = 1000
+# samples_per_file = 100
+# threads = 1
+# results_dir = 'supervised_data_temp_to_delete'
+# scenario = 'hard'
 
-# number_of_samples = 1000000
-# samples_per_file = 5000
-# threads = 10
-# results_dir = 'supervised_data'
+number_of_samples = 1000000
+samples_per_file = 5000
+threads = 100
+results_dir = 'supervised_data'
+scenario = 'hard'
 
-data_collector = RandomStepDataCollector(config, threads)
+params_file = os.path.abspath(os.path.expanduser(
+        os.path.join('~/ModelBasedDDPG/scenario_params', scenario, 'params.pkl')))
+
+data_collector = RandomStepDataCollector(config, threads, params_file)
 if not os.path.exists(results_dir):
     os.makedirs(results_dir)
 collected = 0
