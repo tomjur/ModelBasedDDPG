@@ -34,7 +34,6 @@ openrave_rl:
 
 model:
   buffer_size: 1000000
-#  batch_size: 128
   batch_size: 512
   gamma: 0.99
   potential_points: [5, -0.02, 0.035]
@@ -58,7 +57,7 @@ model:
 
 test:
   test_every_cycles: 50
-  number_of_episodes: 50
+  number_of_episodes: 200
 
 hindsight:
   enable: False
@@ -101,9 +100,8 @@ critic:
 #  layers_before_action: [64]
 #  layers_after_action: [64, 64]
   activation: 'elu'
-#  l2_regularization_coefficient: 0.0
-#  l2_regularization_coefficient: 0.000001
-  l2_regularization_coefficient: 0.0001
+  l2_regularization_coefficient: 0.0
+#  l2_regularization_coefficient: 0.0000005
 #  last_layer_tanh: True
   last_layer_tanh: False
 
