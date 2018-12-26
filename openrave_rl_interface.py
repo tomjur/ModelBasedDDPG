@@ -19,7 +19,9 @@ class OpenraveRLInterface:
         self.max_planner_iterations = self.planner_iterations_start
         self.keep_alive_penalty = config['openrave_rl']['keep_alive_penalty']
         self.truncate_penalty = config['openrave_rl']['truncate_penalty']
-        self.challenging_trajectories_only = config['openrave_rl']['challenging_trajectories_only']
+        self.challenging_trajectories_only = None
+        if 'challenging_trajectories_only' in config['openrave_rl']:
+            self.challenging_trajectories_only = config['openrave_rl']['challenging_trajectories_only']
 
         self.openrave_manager = OpenraveManager(
             config['openrave_rl']['segment_validity_step'], PotentialPoint.from_config(config))

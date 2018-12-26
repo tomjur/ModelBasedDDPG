@@ -41,8 +41,8 @@ def run_for_config(config, print_messages):
 
     # load pretrained model if required
     pre_trained_reward = None
-    reward_model_name = config['model']['reward_model_name']
-    if reward_model_name is not None:
+    if config['model']['use_reward_model'] is not None:
+        reward_model_name = config['model']['reward_model_name']
         pre_trained_reward = PreTrainedReward(reward_model_name, config)
 
     # generate graph:
@@ -303,6 +303,16 @@ def run_for_config(config, print_messages):
     return test_results
 
 
+def overload_config_by_scenario(config):
+    scenario = config['general']['scenario']
+    config['general']['trajectory_directory'] = os.path.abspath(os.path.expanduser(
+        os.path.join('~/ModelBasedDDPG/imitation_data/', scenario)))
+    config['general']['params_file'] = os.path.abspath(os.path.expanduser(
+        os.path.join('~/ModelBasedDDPG/scenario_params', scenario, 'params.pkl')))
+    config['model']['consider_image'] = scenario is 'vision'
+    config['model']['reward_model_name'] = scenario
+
+
 if __name__ == '__main__':
     # disable tf warning
     # os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -311,6 +321,7 @@ if __name__ == '__main__':
     config_path = os.path.join(os.getcwd(), 'config/config.yml')
     with open(config_path, 'r') as yml_file:
         config = yaml.load(yml_file)
+        overload_config_by_scenario(config)
         print('------------ Config ------------')
         print(yaml.dump(config))
 

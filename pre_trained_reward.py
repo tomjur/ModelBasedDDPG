@@ -20,9 +20,7 @@ class PreTrainedReward:
         self.joints_inputs = tf.placeholder(tf.float32, (None, 4), name='joints_inputs')
         self.goal_joints_inputs = tf.placeholder(tf.float32, (None, 4), name='goal_joints_inputs')
         self.workspace_image_inputs = None
-        self.goal_pose_inputs = None
-        if config['model']['consider_goal_pose']:
-            self.goal_pose_inputs = tf.placeholder(tf.float32, (None, 2), name='goal_pose_inputs')
+        self.goal_pose_inputs = tf.placeholder(tf.float32, (None, 2), name='goal_pose_inputs')
         self.action_inputs = tf.placeholder(tf.float32, (None, 4), name='action_inputs')
         self.transition_label = tf.placeholder_with_default([[0.0]*3], (None, 3), name='labeled_transition')
         current_variables_count = len(tf.trainable_variables())

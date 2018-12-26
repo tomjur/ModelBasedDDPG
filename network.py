@@ -237,9 +237,7 @@ class Network(object):
             workspace_image_inputs = tf.placeholder(tf.float32, (None,) + self.image_shape,
                                                     name='workspace_image_inputs')
 
-        goal_pose_inputs = None
-        if self.config['model']['consider_goal_pose']:
-            goal_pose_inputs = tf.placeholder(tf.float32, (None, self.pose_dimensions), name='goal_pose_inputs')
+        goal_pose_inputs = tf.placeholder(tf.float32, (None, self.pose_dimensions), name='goal_pose_inputs')
         return joints_inputs, workspace_image_inputs, goal_joints_inputs, goal_pose_inputs
 
     def _generate_policy_features(self, current_joints):

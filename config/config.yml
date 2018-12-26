@@ -13,12 +13,12 @@ general:
 #  actor_processes: 6
   actor_processes:
 #  actor_processes: 1
-  trajectory_directory: '~/ModelBasedDDPG/imitation_data/hard_workspace_hard_paths/'
   write_train_summaries: 500
   save_model_every_cycles: 100
-#  params_file: # for no params
-#  params_file: 'params_simple.pkl' # simple workspace
-  params_file: 'params_hard.pkl' # hard workspace
+#  scenario: 'no_obstacles'
+#  scenario: 'simple'
+  scenario: 'hard'
+#  scenario: 'vision'
 
 openrave_rl:
   action_step_size: 0.025
@@ -29,8 +29,6 @@ openrave_rl:
   planner_iterations_decrease: 1
   keep_alive_penalty: 0.01
   truncate_penalty: 0.05
-  challenging_trajectories_only: True
-#  challenging_trajectories_only: False
 
 model:
   buffer_size: 1000000
@@ -40,15 +38,10 @@ model:
 #  potential_points: [2, 0., 0.075, 3, 0., 0.085, 4, -0.02, 0.05, 4, 0.005, 0.05, 5, 0.005, 0.035, 5, -0.02, 0.035]
   tau: 0.05
 #  tau: 0.01
-  consider_image: False
-  consider_goal_pose: True
   random_action_probability: 0.2
   random_noise_std: 0.05
   use_reward_model: True
 #  use_reward_model: False
-  reward_model_name: '2018_11_25_10_22_02' # hard workspace with transition label
-#  reward_model_name: '2018_11_10_09_02_38' # hard workspace
-#  reward_model_name: '2018_10_31_10_44_31' # easy workspace
 #  alter_episode: 0  # natural reward and original episode
 #  alter_episode: 1  # use learned reward with episode truncation
   alter_episode: 2  # use learned reward without episode truncation
