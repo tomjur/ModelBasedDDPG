@@ -25,10 +25,11 @@ class ImageCache:
                     continue
                 full_file_path = os.path.join(source_dir, filename)
                 params = WorkspaceParams.load_from_file(full_file_path)
-                np_array = self._get_image_as_numpy(params)
+                # np_array = self._get_image_as_numpy(params)
 
                 self.items.append(
-                    ImageCacheItem(filename, full_file_path, params, np_array)
+                    # ImageCacheItem(filename, full_file_path, params, np_array)
+                    ImageCacheItem(filename, full_file_path, params, None)
                 )
 
     @staticmethod
