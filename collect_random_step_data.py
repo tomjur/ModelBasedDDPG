@@ -75,6 +75,3 @@ while collected < number_of_samples:
     compressed_file.close()
     collected += len(current_buffer)
 data_collector.end()
-
-
-
