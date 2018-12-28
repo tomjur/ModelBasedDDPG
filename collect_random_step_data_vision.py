@@ -25,7 +25,7 @@ class VisionRandomStepCollectorProcess(CollectorProcess):
         random_action = np.array([0.0] + list(random_action))
         next_joints, reward, terminated, status = self.openrave_interface.step(random_action)
 
-        print 'found step'
+        # print 'found step'
 
         # the result contains also the workspace used
         return workspace_id, start_joints, goal_joints, random_action, next_joints, reward, terminated, status
