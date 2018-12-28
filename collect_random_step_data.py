@@ -9,7 +9,7 @@ from data_collector import CollectorProcess, DataCollector
 
 
 class RandomStepCollectorProcess(CollectorProcess):
-    def _get_tuple(self):
+    def _get_tuple(self, query_params=None):
         start_joints, goal_joints, _ = self.openrave_interface.start_new_random(None)
         random_action = np.random.uniform(-1.0, 1.0, len(start_joints) - 1)
         random_action /= np.linalg.norm(random_action)
@@ -22,9 +22,9 @@ class RandomStepDataCollector(DataCollector):
     def _get_queue_size(self, number_of_threads):
         return 100*number_of_threads
 
-    def _get_collector(self, config, queued_data_points, result_queue, collector_specific_queue, params_file=None):
+    def _get_collector(self, config, queued_data_points, collector_specific_queue, params_file=None):
         return RandomStepCollectorProcess(
-            config, queued_data_points, result_queue, collector_specific_queue, params_file)
+            config, queued_data_points, self.results_queue, collector_specific_queue, params_file)
 
 
 def print_status_dist(current_buffer):

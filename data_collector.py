@@ -8,17 +8,19 @@ from workspace_generation_utils import WorkspaceParams
 
 
 class CollectorProcess(multiprocessing.Process):
-    def __init__(self, config, queued_data_points, result_queue, collector_specific_queue, params_file=None):
+    def __init__(self, config, queued_data_points, result_queue, collector_specific_queue, params_file=None,
+                 query_parameters_queue=None):
         multiprocessing.Process.__init__(self)
         self.result_queue = result_queue
         self.collector_specific_queue = collector_specific_queue
         self.config = config
         self.params_file = params_file
+        self.query_parameters_queue = query_parameters_queue
         # members to set at runtime
         self.openrave_interface = None
         self.queued_data_points = queued_data_points
 
-    def _get_tuple(self):
+    def _get_tuple(self, query_params=None):
         pass
 
     def _run_main_loop(self):
@@ -33,7 +35,15 @@ class CollectorProcess(multiprocessing.Process):
             except Queue.Empty:
                 pass
             if self.result_queue.qsize() < self.queued_data_points:
-                self.result_queue.put(self._get_tuple())
+                if self.query_parameters_queue is None:
+                    self.result_queue.put(self._get_tuple())
+                else:
+                    try:
+                        query_parameters = self.query_parameters_queue.get(block=True, timeout=0.001)
+                        self.result_queue.put(self._get_tuple(query_parameters))
+                    except Queue.Empty:
+                        pass
+                time.sleep(1.0)
 
     def run(self):
         workspace_params = None
@@ -44,9 +54,15 @@ class CollectorProcess(multiprocessing.Process):
 
 
 class DataCollector:
-    def __init__(self, config, number_of_threads, params_file=None):
+    def __init__(self, config, number_of_threads, params_file=None, query_parameters=None):
         self.number_of_threads = number_of_threads
         self.results_queue = multiprocessing.Queue()
+        self.query_parameters_queue = None
+        if query_parameters is not None:
+            # put all the query parameters in the designated queue
+            self.query_parameters_queue = multiprocessing.Queue(maxsize=len(query_parameters))
+            for t in query_parameters:
+                self.query_parameters_queue.put(t, True)
         self.collector_specific_queues = [
             multiprocessing.JoinableQueue() for _ in range(self.number_of_threads)
         ]
@@ -54,7 +70,7 @@ class DataCollector:
         queue_size = self._get_queue_size(number_of_threads)
         self.collectors = [
             self._get_collector(
-                copy.deepcopy(config), queue_size, self.results_queue, self.collector_specific_queues[i], params_file
+                copy.deepcopy(config), queue_size, self.collector_specific_queues[i], params_file
             )
             for i in range(self.number_of_threads)
         ]
@@ -65,7 +81,7 @@ class DataCollector:
     def _get_queue_size(self, number_of_threads):
         pass
 
-    def _get_collector(self, config, queued_data_points, result_queue, collector_specific_queue, params_file=None):
+    def _get_collector(self, config, queued_data_points, collector_specific_queue, params_file=None):
         pass
 
     def generate_samples(self, number_of_samples):

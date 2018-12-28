@@ -6,22 +6,30 @@ import numpy as np
 from workspace_generation_utils import WorkspaceParams
 
 
+class ImageCacheItem:
+    def __init__(self, workspace_id, full_filename, params, np_array):
+        self.workspace_id = workspace_id
+        self.full_filename = full_filename
+        self.params = params
+        self.np_array = np_array
+
+
 class ImageCache:
     def __init__(self, params_directory):
-        self.images = {}
-        self.params = {}
+        self.items = []
 
         source_dir = os.path.expanduser(params_directory)
         for dirpath, dirnames, filenames in os.walk(source_dir):
             for filename in filenames:
+                if not filename.endswith('.pkl'):
+                    continue
                 full_file_path = os.path.join(source_dir, filename)
                 params = WorkspaceParams.load_from_file(full_file_path)
-
-                self.params[filename] = params
-
                 np_array = self._get_image_as_numpy(params)
 
-                self.images[filename] = np_array
+                self.items.append(
+                    ImageCacheItem(filename, full_file_path, params, np_array)
+                )
 
     @staticmethod
     def _figure_to_nparray(fig):
