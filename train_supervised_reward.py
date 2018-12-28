@@ -32,10 +32,11 @@ learn_rate_decrease_rate = config['reward']['learn_rate_decrease_rate']
 
 test_batch_size = batch_size * 10
 
-# train = load_data_from(os.path.join('supervised_data', 'train'), 100000)
-# test = load_data_from(os.path.join('supervised_data', 'test'), 100000)
-train = load_data_from(os.path.join('supervised_data', 'train'))
-test = load_data_from(os.path.join('supervised_data', 'test'))
+base_data_dir = os.path.join('supervised_data', config['general']['scenario'])
+# train = load_data_from(os.path.join(base_data_dir, 'train'), 100000)
+# test = load_data_from(os.path.join(base_data_dir, 'test'), 100000)
+train = load_data_from(os.path.join(base_data_dir, 'train'))
+test = load_data_from(os.path.join(base_data_dir, 'test'))
 
 
 def describe_data(data_collection):
