@@ -80,6 +80,9 @@ class DataCollector:
         message = (1, )
         self._post_private_message(message)
         time.sleep(10)
+        for c in self.collectors:
+            c.terminate()
+        time.sleep(10)
 
     def _post_private_message(self, message):
         for collector_queue in self.collector_specific_queues:
