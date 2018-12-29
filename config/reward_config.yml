@@ -17,11 +17,10 @@ openrave_rl:
   truncate_penalty: 0.05
 
 model:
-  batch_size: 1024
+  batch_size: 10240
   potential_points: [2, 0., 0.075, 3, 0., 0.085, 4, -0.02, 0.05, 4, 0.005, 0.05, 5, 0.005, 0.035, 5, -0.02, 0.035]
   consider_image: False
   consider_goal_pose: True
-
 
 reward:
 #  initial_learn_rate: 0.001
