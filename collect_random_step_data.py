@@ -44,8 +44,8 @@ with open(config_path, 'r') as yml_file:
 
 config['openrave_rl']['challenging_trajectories_only'] = False
 
-# number_of_samples = 1000
-# samples_per_file = 100
+# number_of_samples = 30
+# samples_per_file = 10
 # threads = 1
 # results_dir = 'supervised_data_temp_to_delete'
 # scenario = 'hard'

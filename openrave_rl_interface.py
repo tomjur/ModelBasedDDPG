@@ -10,7 +10,7 @@ class OpenraveRLInterface:
     #     collision = 2
     #     close_to_goal = 3
 
-    def __init__(self, config, workspace_params=None):
+    def __init__(self, config):
         self.action_step_size = config['openrave_rl']['action_step_size']
         self.goal_sensitivity = config['openrave_rl']['goal_sensitivity']
         self.planner_iterations_start = config['openrave_rl']['planner_iterations_start']
@@ -25,9 +25,6 @@ class OpenraveRLInterface:
 
         self.openrave_manager = OpenraveManager(
             config['openrave_rl']['segment_validity_step'], PotentialPoint.from_config(config))
-        self.workspace_params = workspace_params
-        if workspace_params is not None:
-            self.openrave_manager.load_params(workspace_params)
 
         self.current_joints = None
         self.goal_joints = None
@@ -108,15 +105,16 @@ class OpenraveRLInterface:
         return start_pose[1] > 0.0 and goal_pose[1] > 0.0
 
     def _is_challenging(self, start_pose, goal_pose):
-        if self.workspace_params is None or self.workspace_params.number_of_obstacles == 0:
+        workspace_params = self.openrave_manager.loaded_params
+        if workspace_params is None or workspace_params.number_of_obstacles == 0:
             return True
         # check if the distance from any obstacle is smaller that the start-goal-distance
         start = np.array(start_pose)
         goal = np.array(goal_pose)
         start_goal_distance = np.linalg.norm(start - goal)
-        for i in range(self.workspace_params.number_of_obstacles):
+        for i in range(workspace_params.number_of_obstacles):
             obstacle = np.array(
-                [self.workspace_params.centers_position_x[i], self.workspace_params.centers_position_z[i]]
+                [workspace_params.centers_position_x[i], workspace_params.centers_position_z[i]]
             )
             start_obstacle_distance = np.linalg.norm(start - obstacle)
             goal_obstacle_distance = np.linalg.norm(goal - obstacle)

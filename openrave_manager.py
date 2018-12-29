@@ -28,10 +28,11 @@ class OpenraveManager(object):
         # translate the potential to list of (unprocessed_point, link, coordinate)
         self.potential_points = potential_points
         self.joint_safety = 0.0001
-        self.loaded_params_name = None
+        self.loaded_params_path = None
+        self.loaded_params = None
 
-    def load_params(self, workspace_params, params_name):
-        if self.loaded_params_name is not None and self.loaded_params_name == params_name:
+    def load_params(self, workspace_params, params_path):
+        if self.loaded_params_path is not None and self.loaded_params_path == params_path:
             # already loaded
             return
         with self.env:
@@ -54,14 +55,25 @@ class OpenraveManager(object):
                 transformation_matrix[:3, :3] = rotation_matrix
                 body.SetTransform(transformation_matrix)
                 self.objects.append(body)
-        self.loaded_params_name = params_name
+        self.loaded_params_path = params_path
+        self.loaded_params = workspace_params
 
     def remove_objects(self):
         with self.env:
             while len(self.objects):
                 body = self.objects.pop()
                 self.env.Remove(body)
-        self.loaded_params_name = None
+        self.loaded_params_path = None
+        self.loaded_params = None
+
+    def set_params(self, params_path):
+        loaded = self.loaded_params_path
+        if loaded is None:
+            self.load_params(WorkspaceParams.load_from_file(params_path), params_path)
+        else:
+            if loaded != params_path:
+                self.remove_objects()
+                self.load_params(WorkspaceParams.load_from_file(params_path), params_path)
 
     def get_number_of_joints(self):
         return self.robot.GetDOF()

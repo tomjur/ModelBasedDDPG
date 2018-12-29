@@ -4,8 +4,8 @@ general:
   gpu_usage: 0.1
 #  scenario: 'no_obstacles'
 #  scenario: 'simple'
-#  scenario: 'hard'
-  scenario: 'vision'
+  scenario: 'hard'
+#  scenario: 'vision'
 
 openrave_rl:
   action_step_size: 0.025

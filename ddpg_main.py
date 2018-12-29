@@ -317,8 +317,10 @@ def overload_config_by_scenario(config):
     scenario = config['general']['scenario']
     config['general']['trajectory_directory'] = os.path.abspath(os.path.expanduser(
         os.path.join('~/ModelBasedDDPG/imitation_data/', scenario)))
-    config['general']['params_file'] = os.path.abspath(os.path.expanduser(
-        os.path.join('~/ModelBasedDDPG/scenario_params', scenario, 'params.pkl')))
+    params_file = os.path.abspath(os.path.expanduser(os.path.join('~/ModelBasedDDPG/scenario_params', scenario)))
+    if scenario != 'vision':
+        params_file = os.path.join(params_file, 'params.pkl')
+    config['general']['params_file'] = params_file
     config['model']['consider_image'] = scenario is 'vision'
     config['model']['reward_model_name'] = scenario
 

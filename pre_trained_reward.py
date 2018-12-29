@@ -173,7 +173,11 @@ def get_batch_and_labels(batch, openrave_manager, image_cache):
     if image_cache is not None:
         all_images = []
     for i in range(len(batch)):
-        workspace_id, start_joints, goal_joints, action, next_joints, reward, terminated, status = batch[i]
+        if image_cache is None:
+            workspace_id = None
+            start_joints, goal_joints, action, next_joints, reward, terminated, status = batch[i]
+        else:
+            workspace_id, start_joints, goal_joints, action, next_joints, reward, terminated, status = batch[i]
         goal_pose = openrave_manager.get_target_pose(goal_joints)
         all_start_joints.append(start_joints[1:])
         all_goal_joints.append(goal_joints[1:])

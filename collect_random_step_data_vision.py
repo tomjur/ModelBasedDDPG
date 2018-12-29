@@ -15,11 +15,8 @@ class VisionRandomStepCollectorProcess(CollectorProcess):
         assert query_params is not None
         workspace_id = query_params[0]
         full_workspace_path = query_params[1]
-        current_loaded_params = self.openrave_interface.openrave_manager.loaded_params_name
-        if current_loaded_params is None or current_loaded_params != workspace_id:
-            self.openrave_interface.openrave_manager.remove_objects()
-            workspace_params = WorkspaceParams.load_from_file(full_workspace_path)
-            self.openrave_interface.openrave_manager.load_params(workspace_params, workspace_id)
+
+        self.openrave_interface.openrave_manager.set_params(full_workspace_path)
 
         start_joints, goal_joints, _ = self.openrave_interface.start_new_random(None)
         random_action = np.random.uniform(-1.0, 1.0, len(start_joints) - 1)
@@ -58,10 +55,10 @@ with open(config_path, 'r') as yml_file:
 
 config['openrave_rl']['challenging_trajectories_only'] = False
 
-# number_of_samples_per_workspace = 9
-# samples_per_file = 3
-# threads = 2
-# results_dir = 'supervised_data_temp_to_delete'
+# number_of_samples_per_workspace = 4
+# samples_per_file = 2
+# threads = 1
+# results_dir = 'supervised_data_vision_temp_to_delete'
 
 number_of_samples_per_workspace = 1000
 samples_per_file = 1000

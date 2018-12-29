@@ -16,11 +16,7 @@ class VisionTrajectoryCollectorProcess(CollectorProcess):
         workspace_id = query_params[0]
         full_workspace_path = query_params[1]
 
-        current_loaded_params = self.openrave_interface.openrave_manager.loaded_params_name
-        if current_loaded_params is None or current_loaded_params != workspace_id:
-            self.openrave_interface.openrave_manager.remove_objects()
-            workspace_params = WorkspaceParams.load_from_file(full_workspace_path)
-            self.openrave_interface.openrave_manager.load_params(workspace_params, workspace_id)
+        self.openrave_interface.openrave_manager.set_params(full_workspace_path)
 
         start_joints, goal_joints, _, trajectory = self.openrave_interface.start_new_random(None, return_traj=True)
         trajectory_poses = [
@@ -51,7 +47,7 @@ config['openrave_rl']['challenging_trajectories_only'] = True
 # number_of_samples_per_workspace = 2
 # samples_per_file = 1
 # threads = 3
-# results_dir = 'imitation_data_temp_to_delete'
+# results_dir = 'imitation_data_vision_temp_to_delete'
 
 number_of_samples_per_workspace = 1000
 samples_per_file = 1000

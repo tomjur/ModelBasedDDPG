@@ -44,11 +44,10 @@ class RandomQueryCollectorProcess(multiprocessing.Process):
                 self.result_queue.put(result)
 
     def run(self):
+        self.openrave_interface = OpenraveRLInterface(self.config)
         params_file = self.config['general']['params_file']
-        workspace_params = None
         if params_file is not None:
-            workspace_params = WorkspaceParams.load_from_file(params_file)
-        self.openrave_interface = OpenraveRLInterface(self.config, workspace_params)
+            self.openrave_interface.openrave_manager.set_params(params_file)
         self._run_main_loop()
 
 
@@ -233,12 +232,11 @@ class ActorProcess(multiprocessing.Process):
 
     def run(self):
         params_file = os.path.abspath(os.path.expanduser(self.config['general']['params_file']))
-        workspace_params = None
+        self.openrave_interface = OpenraveRLInterface(self.config)
         if not os.path.isdir(params_file):
             if params_file is not None:
                 # we have a single params file - just load it
-                workspace_params = WorkspaceParams.load_from_file(params_file)
-        self.openrave_interface = OpenraveRLInterface(self.config, workspace_params)
+                self.openrave_interface.openrave_manager.set_params(params_file)
 
         with tf.Session(
                 config=tf.ConfigProto(

@@ -46,10 +46,9 @@ class CollectorProcess(multiprocessing.Process):
                 time.sleep(1.0)
 
     def run(self):
-        workspace_params = None
+        self.openrave_interface = OpenraveRLInterface(self.config)
         if self.params_file is not None:
-            workspace_params = WorkspaceParams.load_from_file(self.params_file)
-        self.openrave_interface = OpenraveRLInterface(self.config, workspace_params)
+            self.openrave_interface.openrave_manager.set_params(self.params_file)
         self._run_main_loop()
 
 

@@ -8,8 +8,8 @@ class ReplayBuffer(object):
         self.count = 0
         self.buffer = deque()
 
-    def add(self, goal_pose, goal_joints, workspace_image, current_state, action, reward, terminated, next_state):
-        experience = (goal_pose, goal_joints, workspace_image, current_state, action, reward, terminated, next_state)
+    def add(self, goal_pose, goal_joints, workspace_id, current_state, action, reward, terminated, next_state):
+        experience = (goal_pose, goal_joints, workspace_id, current_state, action, reward, terminated, next_state)
         if self.count < self.buffer_size:
             self.buffer.append(experience)
             self.count += 1
