@@ -28,8 +28,12 @@ class OpenraveManager(object):
         # translate the potential to list of (unprocessed_point, link, coordinate)
         self.potential_points = potential_points
         self.joint_safety = 0.0001
+        self.loaded_params_name = None
 
-    def load_params(self, workspace_params):
+    def load_params(self, workspace_params, params_name):
+        if self.loaded_params_name is not None and self.loaded_params_name == params_name:
+            # already loaded
+            return
         with self.env:
             for i in range(workspace_params.number_of_obstacles):
                 body = RaveCreateKinBody(self.env, '')
@@ -50,12 +54,14 @@ class OpenraveManager(object):
                 transformation_matrix[:3, :3] = rotation_matrix
                 body.SetTransform(transformation_matrix)
                 self.objects.append(body)
+        self.loaded_params_name = params_name
 
     def remove_objects(self):
         with self.env:
             while len(self.objects):
                 body = self.objects.pop()
                 self.env.Remove(body)
+        self.loaded_params_name = None
 
     def get_number_of_joints(self):
         return self.robot.GetDOF()

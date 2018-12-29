@@ -15,17 +15,17 @@ class VisionRandomStepCollectorProcess(CollectorProcess):
         assert query_params is not None
         workspace_id = query_params[0]
         full_workspace_path = query_params[1]
-        self.openrave_interface.openrave_manager.remove_objects()
-        workspace_params = WorkspaceParams.load_from_file(full_workspace_path)
-        self.openrave_interface.openrave_manager.load_params(workspace_params)
+        current_loaded_params = self.openrave_interface.openrave_manager.loaded_params_name
+        if current_loaded_params is None or current_loaded_params != workspace_id:
+            self.openrave_interface.openrave_manager.remove_objects()
+            workspace_params = WorkspaceParams.load_from_file(full_workspace_path)
+            self.openrave_interface.openrave_manager.load_params(workspace_params, workspace_id)
 
         start_joints, goal_joints, _ = self.openrave_interface.start_new_random(None)
         random_action = np.random.uniform(-1.0, 1.0, len(start_joints) - 1)
         random_action /= np.linalg.norm(random_action)
         random_action = np.array([0.0] + list(random_action))
         next_joints, reward, terminated, status = self.openrave_interface.step(random_action)
-
-        # print 'found step'
 
         # the result contains also the workspace used
         return workspace_id, start_joints, goal_joints, random_action, next_joints, reward, terminated, status
