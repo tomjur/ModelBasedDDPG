@@ -15,9 +15,12 @@ class VisionTrajectoryCollectorProcess(CollectorProcess):
         assert query_params is not None
         workspace_id = query_params[0]
         full_workspace_path = query_params[1]
-        self.openrave_interface.openrave_manager.remove_objects()
-        workspace_params = WorkspaceParams.load_from_file(full_workspace_path)
-        self.openrave_interface.openrave_manager.load_params(workspace_params)
+
+        current_loaded_params = self.openrave_interface.openrave_manager.loaded_params_name
+        if current_loaded_params is None or current_loaded_params != workspace_id:
+            self.openrave_interface.openrave_manager.remove_objects()
+            workspace_params = WorkspaceParams.load_from_file(full_workspace_path)
+            self.openrave_interface.openrave_manager.load_params(workspace_params, workspace_id)
 
         start_joints, goal_joints, _, trajectory = self.openrave_interface.start_new_random(None, return_traj=True)
         trajectory_poses = [
@@ -36,14 +39,6 @@ class VisionImitationDataCollector(DataCollector):
             query_parameters_queue=self.query_parameters_queue)
 
 
-def print_status_dist(current_buffer):
-    status = [t[-1] for t in current_buffer]
-    total = len(status)
-    for i in range(1, 4):
-        count = sum([s == i for s in status])
-        print '{}: {} ({})'.format(i, count, float(count) / total)
-
-
 # read the config
 config_path = os.path.join(os.getcwd(), 'config/config.yml')
 with open(config_path, 'r') as yml_file:
@@ -53,15 +48,15 @@ with open(config_path, 'r') as yml_file:
 
 config['openrave_rl']['challenging_trajectories_only'] = True
 
-number_of_samples_per_workspace = 9
-samples_per_file = 3
-threads = 2
-results_dir = 'imitation_data_temp_to_delete'
+# number_of_samples_per_workspace = 2
+# samples_per_file = 1
+# threads = 3
+# results_dir = 'imitation_data_temp_to_delete'
 
-# number_of_samples_per_workspace = 1000
-# samples_per_file = 1000
-# threads = 100
-# results_dir = 'imitation_data'
+number_of_samples_per_workspace = 1000
+samples_per_file = 1000
+threads = 100
+results_dir = 'imitation_data'
 
 if not os.path.exists(results_dir):
     os.makedirs(results_dir)
@@ -84,7 +79,6 @@ while collected < len(collection_queries):
     current_buffer = data_collector.generate_samples(samples_per_file)
     b = datetime.datetime.now()
     print 'data collection took: {}'.format(b - a)
-    print_status_dist(current_buffer)
 
     for t in current_buffer:
         workspace_id = t[0]
