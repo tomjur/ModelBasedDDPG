@@ -65,7 +65,7 @@ params_dir = os.path.abspath(os.path.expanduser('~/ModelBasedDDPG/scenario_param
 image_cache = ImageCache(params_dir)
 collection_queries = []
 workspace_ids = []
-for cache_item in image_cache.items:
+for cache_item in image_cache.items.values():
     collection_queries.extend([(cache_item.workspace_id, cache_item.full_filename)] * number_of_samples_per_workspace)
     workspace_ids.append(cache_item.workspace_id)
 

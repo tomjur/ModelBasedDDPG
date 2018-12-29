@@ -1,3 +1,4 @@
+from image_cache import ImageCache
 from pre_trained_reward import *
 
 import time
@@ -32,7 +33,12 @@ learn_rate_decrease_rate = config['reward']['learn_rate_decrease_rate']
 
 test_batch_size = batch_size * 10
 
-base_data_dir = os.path.join('supervised_data', config['general']['scenario'])
+scenario = config['general']['scenario']
+base_data_dir = os.path.join('supervised_data', scenario)
+image_cache = None
+if scenario == 'vision':
+    params_dir = os.path.abspath(os.path.expanduser('~/ModelBasedDDPG/scenario_params/vision/'))
+    image_cache = ImageCache(params_dir)
 # train = load_data_from(os.path.join(base_data_dir, 'train'), 100000)
 # test = load_data_from(os.path.join(base_data_dir, 'test'), 100000)
 train = load_data_from(os.path.join(base_data_dir, 'train'))
@@ -160,7 +166,7 @@ with tf.Session(
             data_index += batch_size
             if train_batch is None:
                 continue
-            train_batch, train_rewards, train_status = get_batch_and_labels(train_batch, openrave_manager)
+            train_batch, train_rewards, train_status = get_batch_and_labels(train_batch, openrave_manager, image_cache)
             train_status_one_hot = np.zeros((len(train_rewards), 3), dtype=np.float32)
             train_status_one_hot[np.arange(len(train_rewards)), np.array(train_status)-1] = 1.0
             train_feed = pre_trained_reward.make_feed(*train_batch, all_transition_labels=train_status_one_hot)
@@ -180,7 +186,7 @@ with tf.Session(
             # run test for one (random) batch
             random.shuffle(test)
             test_batch = oversample_batch(test, 0, test_batch_size, oversample_large_magnitude=False)
-            test_batch, test_rewards, test_status = get_batch_and_labels(test_batch, openrave_manager)
+            test_batch, test_rewards, test_status = get_batch_and_labels(test_batch, openrave_manager, image_cache)
             test_feed = pre_trained_reward.make_feed(*test_batch)
             test_feed[reward_input] = np.expand_dims(np.array(test_rewards), axis=1)
             test_feed[status_input] = np.array(test_status)

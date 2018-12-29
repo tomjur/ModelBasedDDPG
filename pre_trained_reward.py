@@ -8,8 +8,6 @@ import tensorflow.contrib.layers as tf_layers
 
 from dqn_model import DqnModel
 from modeling_utils import get_activation
-from openrave_manager import OpenraveManager
-from potential_point import PotentialPoint
 
 
 class PreTrainedReward:
@@ -18,12 +16,14 @@ class PreTrainedReward:
         self._reuse_flag = False
 
         self.config = config
+        self.is_vision_enabled = config['general']['scenario'] == 'vision'
+
         self.joints_inputs = tf.placeholder(tf.float32, (None, 4), name='joints_inputs')
         self.goal_joints_inputs = tf.placeholder(tf.float32, (None, 4), name='goal_joints_inputs')
         self.workspace_image_inputs = None
+        if self.is_vision_enabled:
+            self.workspace_image_inputs = tf.placeholder(tf.float32, (None, 445, 222, 3), name='workspace_image_inputs')
         self.goal_pose_inputs = tf.placeholder(tf.float32, (None, 2), name='goal_pose_inputs')
-        if config['model']['consider_image']:
-            self.workspace_image_inputs = tf.placeholder(tf.float32, (None, 111, 55, 1), name='image_inputs')
         self.action_inputs = tf.placeholder(tf.float32, (None, 4), name='action_inputs')
         self.transition_label = tf.placeholder_with_default([[0.0]*3], (None, 3), name='labeled_transition')
         current_variables_count = len(tf.trainable_variables())
@@ -76,8 +76,8 @@ class PreTrainedReward:
         current = tf.concat(
             (clipped_next_joints, self._generate_goal_features(goal_joints_inputs, goal_pose_inputs)), axis=1)
         # add vision if needed
-        if self.workspace_image_inputs is not None:
-            visual_inputs = DqnModel.predict(self.workspace_image_inputs)
+        if self.is_vision_enabled:
+            visual_inputs = DqnModel.predict(workspace_image_inputs)
             current = tf.concat((current, visual_inputs), axis=1)
         for i, layer_size in enumerate(layers):
             _activation = None if i == len(layers) - 1 else get_activation(self.config['reward']['activation'])
@@ -121,8 +121,8 @@ class PreTrainedReward:
                               images)
         return sess.run([self.reward_prediction, self.status_softmax_logits], feed)
 
-    def make_feed(self, all_start_joints, all_goal_joints, all_actions, all_goal_poses, all_transition_labels=None,
-                  images=None):
+    def make_feed(self, all_start_joints, all_goal_joints, all_actions, all_goal_poses, images=None,
+                  all_transition_labels=None):
         feed = {
             self.joints_inputs: all_start_joints,
             self.goal_joints_inputs: all_goal_joints,
@@ -130,7 +130,8 @@ class PreTrainedReward:
         }
         if self.goal_pose_inputs is not None:
             feed[self.goal_pose_inputs] = all_goal_poses
-        if self.workspace_image_inputs is not None:
+        if self.is_vision_enabled:
+            assert images is not None
             feed[self.workspace_image_inputs] = images
         if all_transition_labels is not None:
             feed[self.transition_label] = all_transition_labels
@@ -161,15 +162,18 @@ def oversample_batch(data_collection, data_index, batch_size, oversample_large_m
     return [current_batch[i] for i in batch_indices]
 
 
-def get_batch_and_labels(batch, openrave_manager):
+def get_batch_and_labels(batch, openrave_manager, image_cache):
     all_start_joints = []
     all_goal_joints = []
     all_actions = []
     all_rewards = []
     all_goal_poses = []
     all_status = []
+    all_images = None
+    if image_cache is not None:
+        all_images = []
     for i in range(len(batch)):
-        start_joints, goal_joints, action, next_joints, reward, terminated, status = batch[i]
+        workspace_id, start_joints, goal_joints, action, next_joints, reward, terminated, status = batch[i]
         goal_pose = openrave_manager.get_target_pose(goal_joints)
         all_start_joints.append(start_joints[1:])
         all_goal_joints.append(goal_joints[1:])
@@ -177,7 +181,10 @@ def get_batch_and_labels(batch, openrave_manager):
         all_rewards.append(reward)
         all_status.append(status)
         all_goal_poses.append(goal_pose)
-    return [all_start_joints, all_goal_joints, all_actions, all_goal_poses], all_rewards, all_status
+        if image_cache is not None:
+            image = image_cache.items[workspace_id].np_array
+            all_images.append(image)
+    return [all_start_joints, all_goal_joints, all_actions, all_goal_poses, all_images], all_rewards, all_status
 
 
 def compute_stats_single_class(real_status, real_reward, status_prediction, reward_prediction, class_indicator):
@@ -223,45 +230,3 @@ def load_data_from(data_dir, max_read=None):
         compressed_file.close()
         total_buffer.extend(current_buffer)
     return total_buffer
-
-
-def print_model_stats(pre_trained_reward_network, test_batch_size, sess):
-    # read the data
-    test = load_data_from(os.path.join('supervised_data', 'test'), max_read=10 * test_batch_size)
-    print len(test)
-
-    # partition to train and test
-    random.shuffle(test)
-
-    openrave_manager = OpenraveManager(0.001, PotentialPoint.from_config(pre_trained_reward_network.config))
-
-    sess.run(tf.global_variables_initializer())
-
-    # run test for one (random) batch
-    random.shuffle(test)
-    test_batch = oversample_batch(test, 0, test_batch_size)
-    test_batch, test_rewards, test_status = get_batch_and_labels(test_batch, openrave_manager)
-    reward_prediction, status_prediction = pre_trained_reward_network.make_prediction(*([sess] + test_batch))
-    # see what happens for different reward classes:
-    goal_rewards_stats, collision_rewards_stats, other_rewards_stats = compute_stats_per_class(
-        test_status, test_rewards, status_prediction, reward_prediction)
-    print 'before loading weights'
-    print 'goal mean_error {} max_error {} accuracy {}'.format(*goal_rewards_stats)
-    print 'collision mean_error {} max_error {} accuracy {}'.format(*collision_rewards_stats)
-    print 'other mean_error {} max_error {} accuracy {}'.format(*other_rewards_stats)
-
-    # load weights
-    pre_trained_reward_network.load_weights(sess)
-    # run test for one (random) batch
-    random.shuffle(test)
-
-    test_batch = oversample_batch(test, 0, test_batch_size)
-    test_batch, test_rewards, test_status = get_batch_and_labels(test_batch, openrave_manager)
-    reward_prediction, status_prediction = pre_trained_reward_network.make_prediction(*([sess] + test_batch))
-    # see what happens for different reward classes:
-    goal_rewards_stats, collision_rewards_stats, other_rewards_stats = compute_stats_per_class(
-        test_status, test_rewards, status_prediction, reward_prediction)
-    print 'after loading weights'
-    print 'goal mean_error {} max_error {} accuracy {}'.format(*goal_rewards_stats)
-    print 'collision mean_error {} max_error {} accuracy {}'.format(*collision_rewards_stats)
-    print 'other mean_error {} max_error {} accuracy {}'.format(*other_rewards_stats)
