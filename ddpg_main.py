@@ -296,8 +296,13 @@ def run_for_config(config, print_messages):
             if is_best:
                 saver.save(sess, os.path.join(saver_dir, 'best'), global_step=global_step)
 
-    print 'best model stats at step {} has success rate of {}'.format(
+    last_message = 'best model stats at step {} has success rate of {}'.format(
         best_model_global_step, best_model_test_success_rate)
+    print last_message
+
+    with open(os.path.join(completed_trajectories_dir, 'final_status.txt'), 'w') as f:
+        f.write(last_message)
+        f.flush()
 
     rollout_manager.end()
     return test_results
