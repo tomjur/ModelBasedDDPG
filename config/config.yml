@@ -72,10 +72,11 @@ curriculum:
 actor:
   learning_rate: 0.001
 #  gradient_limit: 0.0
-  gradient_limit: 0.01
+  gradient_limit: 1.0
 
 action_predictor:
   layers: [200, 200, 200, 200]
+#  layers: [300, 300, 200, 200, 100]
 #  layers: [64, 64, 64]
   activation: 'elu'
   tanh_preactivation_loss_coefficient: 1.0
@@ -93,8 +94,8 @@ critic:
 #  layers_before_action: [64]
 #  layers_after_action: [64, 64]
   activation: 'elu'
-  l2_regularization_coefficient: 0.0
-#  l2_regularization_coefficient: 0.0000005
+#  l2_regularization_coefficient: 0.0
+  l2_regularization_coefficient: 0.0000001
 #  last_layer_tanh: True
   last_layer_tanh: False
 
