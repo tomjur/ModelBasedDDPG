@@ -14,15 +14,20 @@ from potential_point import PotentialPoint
 from workspace_generation_utils import WorkspaceParams
 
 trajectories_dir = os.path.abspath(os.path.expanduser('/home/tom/ModelBasedDDPG/trajectories'))
-model_name = '2018_11_05_11_41_15'
-global_step = '36040'
-path_id = '0'
+model_name = '2018_12_31_11_38_52'  # step 134040 path 71 (91, 99, 145)
+global_step = '134040'
+path_id = '32'
 message = 'max_len'
 # message = 'collision'
 # message = 'success'
 # workspace_params_path = None
-workspace_params_path = 'params.pkl'
-speed = 10.0
+
+# scenario = 'simple'
+scenario = 'hard'
+# scenario = 'vision'
+workspace_params_path = os.path.abspath(os.path.expanduser(
+    os.path.join('/home/tom/ModelBasedDDPG/scenario_params', scenario, 'params.pkl')))
+speed = 30.0
 
 display_start_goal_end_spheres = True
 trajectory_spheres_radius = 0.01
@@ -60,7 +65,7 @@ def main():
 
     openrave_manager = OpenraveManager(0.001, potential_points)
     if workspace_params_path is not None:
-        openrave_manager.load_params(WorkspaceParams.load_from_file(workspace_params_path))
+        openrave_manager.set_params(workspace_params_path)
     openrave_manager.get_initialized_viewer()
     # visualize the trajectory
     # search_key = os.path.join(model_dir, '{}_step_{}_{}.p'.format(global_step, message, path_id))
