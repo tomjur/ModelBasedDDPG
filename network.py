@@ -29,9 +29,9 @@ class Network(object):
         # since we take partial derivatives w.r.t subsets of the parameters, we always need to remember which parameters
         # are currently being added. note that this also causes the model to be non thread safe, therefore the creation
         # must happen sequentially
-        variable_count = len(tf.trainable_variables())
 
         # online actor network
+        variable_count = len(tf.trainable_variables())
         actor_results = self._create_actor_network(self.joints_inputs, is_online=True, reuse_flag=False)
         self.online_action = actor_results[0]
         online_actor_tanh = actor_results[1]
@@ -44,6 +44,21 @@ class Network(object):
         self.online_actor_parameters_assign_ops = [
             tf.assign(var, self.online_actor_parameter_weights_placeholders[var.name])
             for var in self.online_actor_params
+        ]
+
+        # target actor network
+        variable_count = len(tf.trainable_variables())
+        actor_results = self._create_actor_network(self.joints_inputs, is_online=False, reuse_flag=False)
+        self.target_action = actor_results[0]
+        self.target_actor_params = tf.trainable_variables()[variable_count:]
+
+        # create placeholders and assign ops to set these weights manually (used by rollout agents)
+        self.target_actor_parameter_weights_placeholders = {
+            var.name: tf.placeholder(tf.float32, var.get_shape()) for var in self.target_actor_params
+        }
+        self.target_actor_parameters_assign_ops = [
+            tf.assign(var, self.target_actor_parameter_weights_placeholders[var.name])
+            for var in self.target_actor_params
         ]
 
         # this is as much as a rollout agent needs
@@ -65,17 +80,11 @@ class Network(object):
             forward_model_tanh = actor_results[1]
             assert variable_count == len(tf.trainable_variables())  # make sure no new parameters were added
 
-        # target actor network
-        variable_count = len(tf.trainable_variables())
-        actor_results = self._create_actor_network(self.joints_inputs, is_online=False, reuse_flag=False)
-        self.target_action = actor_results[0]
-        target_actor_params = tf.trainable_variables()[variable_count:]
-
         # periodically update target actor with online actor weights
         self.update_actor_target_params = \
-            [target_actor_params[i].assign(
-                tf.multiply(self.online_actor_params[i], tau) + tf.multiply(target_actor_params[i], 1. - tau)
-            ) for i in range(len(target_actor_params))]
+            [self.target_actor_params[i].assign(
+                tf.multiply(self.online_actor_params[i], tau) + tf.multiply(self.target_actor_params[i], 1. - tau)
+            ) for i in range(len(self.target_actor_params))]
 
         # create inputs for the critic and reward network when using a constant action
         self.action_inputs = tf.placeholder(tf.float32, (None, self.number_of_joints), name='action_inputs')
@@ -367,15 +376,20 @@ class Network(object):
         )
         return sess.run(self.online_action if use_online_network else self.target_action, feed_dictionary)
 
-    def get_actor_online_weights(self, sess):
-        return sess.run(self.online_actor_params)
+    def get_actor_weights(self, sess, is_online):
+        weights = self.online_actor_params if is_online else self.target_actor_params
+        return sess.run(weights)
 
-    def set_actor_online_weights(self, sess, weights):
+    def set_actor_weights(self, sess, weights, is_online):
+        params = self.online_actor_params if is_online else self.target_actor_params
+        placeholders = self.online_actor_parameter_weights_placeholders if is_online else \
+            self.target_actor_parameter_weights_placeholders
         feed = {
-            self.online_actor_parameter_weights_placeholders[var.name]: weights[i]
-            for i, var in enumerate(self.online_actor_params)
+            placeholders[var.name]: weights[i]
+            for i, var in enumerate(params)
         }
-        sess.run(self.online_actor_parameters_assign_ops, feed)
+        ops = self.online_actor_parameters_assign_ops if is_online else self.target_actor_parameters_assign_ops
+        sess.run(ops, feed)
 
     def update_target_networks(self, sess):
         sess.run([self.update_critic_target_params, self.update_actor_target_params])

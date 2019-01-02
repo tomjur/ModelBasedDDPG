@@ -159,7 +159,7 @@ def run_for_config(config, print_messages):
         return status, states, actions, rewards, goal_pose, goal_joints, workspace_image
 
     def do_test(sess, best_model_global_step, best_model_test_success_rate):
-        rollout_manager.set_policy_weights(network.get_actor_online_weights(sess))
+        rollout_manager.set_policy_weights(network.get_actor_weights(sess, is_online=False), is_online=False)
         eval_result = trajectory_eval.eval(global_step)
         test_episodes = eval_result[0]
         test_successful_episodes = eval_result[1]
@@ -209,7 +209,7 @@ def run_for_config(config, print_messages):
         for update_index in range(config['general']['updates_cycle_count']):
             # collect data
             a = datetime.datetime.now()
-            rollout_manager.set_policy_weights(network.get_actor_online_weights(sess))
+            rollout_manager.set_policy_weights(network.get_actor_weights(sess, is_online=True), is_online=True)
             episodes_per_update = config['general']['episodes_per_update']
             episode_results = rollout_manager.generate_episodes(episodes_per_update, True)
             episodes_agent_trajectory, episodes_times, episodes_example_trajectory = zip(*episode_results)

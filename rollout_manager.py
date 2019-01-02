@@ -159,7 +159,7 @@ class ActorProcess(multiprocessing.Process):
         for j in range(max_steps):
             # do a single step prediction
             action_mean = self.actor.predict_action(
-                [current_state[0]], [None], [goal_pose], [goal_joints], sess, use_online_network=True
+                [current_state[0]], [None], [goal_pose], [goal_joints], sess, use_online_network=is_train
             )[0]
             sampled_action = self._get_sampled_action(action_mean) if is_train else action_mean
             # make an environment step
@@ -216,7 +216,8 @@ class ActorProcess(multiprocessing.Process):
                 elif task_type == 2:
                     # update the weights
                     new_weights = next_actor_specific_task[1]
-                    self.actor.set_actor_online_weights(sess, new_weights)
+                    is_online = next_actor_specific_task[2]
+                    self.actor.set_actor_weights(sess, new_weights, is_online=is_online)
                     self.actor_specific_queue.task_done()
             except Queue.Empty:
                 pass
@@ -388,8 +389,8 @@ class FixedRolloutManager:
 
         return episodes
 
-    def set_policy_weights(self, weights):
-        message = (2, weights)
+    def set_policy_weights(self, weights, is_online):
+        message = (2, weights, is_online)
         self._post_private_message(message, self.actor_specific_queues)
 
     def end(self):

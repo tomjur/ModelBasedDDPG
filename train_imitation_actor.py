@@ -206,7 +206,7 @@ with tf.Session(
 
         # test
         # set current weights
-        actor_trained_weights = network.get_actor_online_weights(sess)
+        actor_trained_weights = network.get_actor_weights(sess, is_online=True)
         train_rollout_manager.set_policy_weights(actor_trained_weights)
         test_rollout_manager.set_policy_weights(actor_trained_weights)
         random_rollout_manager.set_policy_weights(actor_trained_weights)
