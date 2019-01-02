@@ -38,8 +38,8 @@ model:
 #  potential_points: [2, 0., 0.075, 3, 0., 0.085, 4, -0.02, 0.05, 4, 0.005, 0.05, 5, 0.005, 0.035, 5, -0.02, 0.035]
   tau: 0.05
 #  tau: 0.01
-  random_action_probability: 0.2
-  random_noise_std: 0.05
+  random_action_probability: 0.02
+  random_noise_std: 0.005
   use_reward_model: True
 #  use_reward_model: False
 #  alter_episode: 0  # natural reward and original episode
