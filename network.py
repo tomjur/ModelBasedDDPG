@@ -9,7 +9,7 @@ from potential_point import PotentialPoint
 
 
 class Network(object):
-    def __init__(self, config, is_rollout_agent, image_shape=(445, 222, 3), number_of_joints=4, pose_dimensions=2,
+    def __init__(self, config, is_rollout_agent, image_shape=(55, 111), number_of_joints=4, pose_dimensions=2,
                  pre_trained_reward=None):
         self.config = config
         self.potential_points = PotentialPoint.from_config(config)
@@ -25,6 +25,11 @@ class Network(object):
         self.workspace_image_inputs = all_inputs[1]
         self.goal_joints_inputs = all_inputs[2]
         self.goal_pose_inputs = all_inputs[3]
+
+        # images for vision
+        self.images_3d = None
+        if self.workspace_image_inputs is not None:
+            self.images_3d = tf.expand_dims(self.workspace_image_inputs, axis=-1)
 
         # since we take partial derivatives w.r.t subsets of the parameters, we always need to remember which parameters
         # are currently being added. note that this also causes the model to be non thread safe, therefore the creation
@@ -127,15 +132,11 @@ class Network(object):
             variable_count = len(tf.trainable_variables())
             # reward network to predict the immediate reward of a given action
             self.fixed_action_reward, fixed_action_status = pre_trained_reward.create_reward_network(
-                self.joints_inputs, self.action_inputs, self.goal_joints_inputs, self.goal_pose_inputs,
-                self.workspace_image_inputs
-            )
+                self.joints_inputs, self.action_inputs, self.goal_joints_inputs, self.goal_pose_inputs, self.images_3d)
             self.fixed_action_termination = self._compute_termination_from_status(fixed_action_status)
             # reward network to predict the immediate reward of the online policy action
             self.online_action_reward, online_action_status = pre_trained_reward.create_reward_network(
-                self.joints_inputs, self.online_action, self.goal_joints_inputs, self.goal_pose_inputs,
-                self.workspace_image_inputs
-            )
+                self.joints_inputs, self.online_action, self.goal_joints_inputs, self.goal_pose_inputs, self.images_3d)
             self.online_action_termination = self._compute_termination_from_status(online_action_status)
             assert variable_count == len(tf.trainable_variables())
 
@@ -252,9 +253,9 @@ class Network(object):
     def _generate_policy_features(self, current_joints):
         features = [current_joints, self.goal_joints_inputs]
         # features.append(self.goal_joints_inputs - current_joints)
-        if self.workspace_image_inputs is not None:
+        if self.images_3d is not None:
             perception = DqnModel()
-            features.append(perception.predict(self.workspace_image_inputs))
+            features.append(perception.predict(self.images_3d))
         if self.goal_pose_inputs is not None:
             features.append(self.goal_pose_inputs)
         return tf.concat(features, axis=1)

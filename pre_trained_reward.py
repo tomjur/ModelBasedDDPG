@@ -20,16 +20,16 @@ class PreTrainedReward:
 
         self.joints_inputs = tf.placeholder(tf.float32, (None, 4), name='joints_inputs')
         self.goal_joints_inputs = tf.placeholder(tf.float32, (None, 4), name='goal_joints_inputs')
-        self.workspace_image_inputs = None
+        self.workspace_image_inputs, self.images_3d = None, None
         if self.is_vision_enabled:
             self.workspace_image_inputs = tf.placeholder(tf.float32, (None, 55, 111), name='workspace_image_inputs')
+            self.images_3d = tf.expand_dims(self.workspace_image_inputs, axis=-1)
         self.goal_pose_inputs = tf.placeholder(tf.float32, (None, 2), name='goal_pose_inputs')
         self.action_inputs = tf.placeholder(tf.float32, (None, 4), name='action_inputs')
         self.transition_label = tf.placeholder_with_default([[0.0]*3], (None, 3), name='labeled_transition')
         current_variables_count = len(tf.trainable_variables())
         self.reward_prediction, self.status_softmax_logits = self.create_reward_network(
-            self.joints_inputs, self.action_inputs, self.goal_joints_inputs, self.goal_pose_inputs,
-            self.workspace_image_inputs
+            self.joints_inputs, self.action_inputs, self.goal_joints_inputs, self.goal_pose_inputs, self.images_3d
         )
         reward_variables = tf.trainable_variables()[current_variables_count:]
 
@@ -63,7 +63,7 @@ class PreTrainedReward:
         return clipped_result, unclipped_result
 
     def create_reward_network(
-            self, joints_inputs, action_inputs, goal_joints_inputs, goal_pose_inputs, workspace_image_inputs):
+            self, joints_inputs, action_inputs, goal_joints_inputs, goal_pose_inputs, images_3d):
         name_prefix = 'reward'
         # get the next joints
         clipped_next_joints, unclipped_next_joints = self._next_state_model(joints_inputs, action_inputs)
@@ -77,7 +77,7 @@ class PreTrainedReward:
             (clipped_next_joints, self._generate_goal_features(goal_joints_inputs, goal_pose_inputs)), axis=1)
         # add vision if needed
         if self.is_vision_enabled:
-            visual_inputs = DqnModel.predict(tf.expand_dims(workspace_image_inputs, axis=-1))
+            visual_inputs = DqnModel.predict(images_3d)
             current = tf.concat((current, visual_inputs), axis=1)
         for i, layer_size in enumerate(layers):
             _activation = None if i == len(layers) - 1 else get_activation(self.config['reward']['activation'])
