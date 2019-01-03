@@ -15,7 +15,7 @@ class ImageCacheItem:
 
 
 class ImageCache:
-    def __init__(self, params_directory):
+    def __init__(self, params_directory, create_images=True):
         self.items = {}
 
         source_dir = os.path.expanduser(params_directory)
@@ -25,10 +25,11 @@ class ImageCache:
                     continue
                 full_file_path = os.path.join(source_dir, filename)
                 params = WorkspaceParams.load_from_file(full_file_path)
-                # np_array = self._get_image_as_numpy(params)
+                np_array = None
+                if create_images:
+                    np_array = self._get_image_as_numpy(params)
 
-                # self.items[filename] = ImageCacheItem(filename, full_file_path, params, np_array)
-                self.items[filename] = ImageCacheItem(filename, full_file_path, params, None)
+                self.items[filename] = ImageCacheItem(filename, full_file_path, params, np_array)
 
     @staticmethod
     def _figure_to_nparray(fig):

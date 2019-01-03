@@ -7,7 +7,6 @@ import numpy as np
 
 from data_collector import CollectorProcess, DataCollector
 from image_cache import ImageCache
-from workspace_generation_utils import WorkspaceParams
 
 
 class VisionRandomStepCollectorProcess(CollectorProcess):

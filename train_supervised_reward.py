@@ -39,10 +39,10 @@ image_cache = None
 if scenario == 'vision':
     params_dir = os.path.abspath(os.path.expanduser('~/ModelBasedDDPG/scenario_params/vision/'))
     image_cache = ImageCache(params_dir)
-# train = load_data_from(os.path.join(base_data_dir, 'train'), 100000)
-# test = load_data_from(os.path.join(base_data_dir, 'test'), 100000)
-train = load_data_from(os.path.join(base_data_dir, 'train'))
-test = load_data_from(os.path.join(base_data_dir, 'test'))
+# train = load_data_from(os.path.join(base_data_dir, 'train'), 10000, scenario == 'vision')
+# test = load_data_from(os.path.join(base_data_dir, 'test'), 10000, scenario == 'vision')
+train = load_data_from(os.path.join(base_data_dir, 'train'), is_vision=scenario == 'vision')
+test = load_data_from(os.path.join(base_data_dir, 'test'), is_vision=scenario == 'vision')
 
 
 def describe_data(data_collection):

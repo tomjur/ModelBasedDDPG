@@ -22,7 +22,7 @@ class PreTrainedReward:
         self.goal_joints_inputs = tf.placeholder(tf.float32, (None, 4), name='goal_joints_inputs')
         self.workspace_image_inputs = None
         if self.is_vision_enabled:
-            self.workspace_image_inputs = tf.placeholder(tf.float32, (None, 445, 222, 3), name='workspace_image_inputs')
+            self.workspace_image_inputs = tf.placeholder(tf.float32, (None, 55, 111), name='workspace_image_inputs')
         self.goal_pose_inputs = tf.placeholder(tf.float32, (None, 2), name='goal_pose_inputs')
         self.action_inputs = tf.placeholder(tf.float32, (None, 4), name='action_inputs')
         self.transition_label = tf.placeholder_with_default([[0.0]*3], (None, 3), name='labeled_transition')
@@ -77,7 +77,7 @@ class PreTrainedReward:
             (clipped_next_joints, self._generate_goal_features(goal_joints_inputs, goal_pose_inputs)), axis=1)
         # add vision if needed
         if self.is_vision_enabled:
-            visual_inputs = DqnModel.predict(workspace_image_inputs)
+            visual_inputs = DqnModel.predict(tf.expand_dims(workspace_image_inputs, axis=-1))
             current = tf.concat((current, visual_inputs), axis=1)
         for i, layer_size in enumerate(layers):
             _activation = None if i == len(layers) - 1 else get_activation(self.config['reward']['activation'])
@@ -132,6 +132,7 @@ class PreTrainedReward:
             feed[self.goal_pose_inputs] = all_goal_poses
         if self.is_vision_enabled:
             assert images is not None
+            assert images[0] is not None
             feed[self.workspace_image_inputs] = images
         if all_transition_labels is not None:
             feed[self.transition_label] = all_transition_labels
@@ -220,7 +221,7 @@ def compute_stats_per_class(real_status, real_reward, status_prediction, reward_
     return goal_stats, collision_stats, other_stats
 
 
-def load_data_from(data_dir, max_read=None):
+def load_data_from(data_dir, max_read=None, is_vision=False):
     assert os.path.exists(data_dir)
     files = [file for file in os.listdir(data_dir) if file.endswith(".pkl")]
     assert len(files) > 0
@@ -232,5 +233,9 @@ def load_data_from(data_dir, max_read=None):
         compressed_file = bz2.BZ2File(os.path.join(data_dir, file), 'r')
         current_buffer = pickle.load(compressed_file)
         compressed_file.close()
+        if is_vision:
+            parts = file.split('_')
+            workspace_id = '{}_{}.pkl'.format(parts[0], parts[1])
+            current_buffer = [tuple([workspace_id] + list(t)) for t in current_buffer]
         total_buffer.extend(current_buffer)
     return total_buffer
