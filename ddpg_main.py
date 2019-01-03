@@ -6,7 +6,6 @@ import yaml
 import time
 import numpy as np
 
-from curriculum_manager import CurriculumManager
 from episode_editor import EpisodeEditor
 from hindsight_policy import HindsightPolicy
 from network import Network
@@ -82,8 +81,8 @@ def run_for_config(config, print_messages):
     saver = tf.train.Saver(max_to_keep=4, save_relative_paths=saver_dir)
     yaml.dump(config, open(config_copy_path, 'w'))
     summaries_collector = SummariesCollector(summaries_dir, model_name)
-    curriculum_manager = CurriculumManager(config, print_messages)
     rollout_manager = FixedRolloutManager(config)
+    trajectory_eval = TrajectoryEval(config, rollout_manager, completed_trajectories_dir)
 
     test_results = []
 
@@ -159,6 +158,38 @@ def run_for_config(config, print_messages):
         rewards = [None] * len(actions)
         return status, states, actions, rewards, goal_pose, goal_joints, workspace_image
 
+    def do_test(sess, best_model_global_step, best_model_test_success_rate):
+        rollout_manager.set_policy_weights(network.get_actor_online_weights(sess))
+        eval_result = trajectory_eval.eval(global_step)
+        test_episodes = eval_result[0]
+        test_successful_episodes = eval_result[1]
+        test_collision_episodes = eval_result[2]
+        test_max_len_episodes = eval_result[3]
+        test_mean_reward = eval_result[4]
+        if print_messages:
+            print_state('test', test_episodes, test_successful_episodes, test_collision_episodes,
+                        test_max_len_episodes)
+            print('test mean total reward {}'.format(test_mean_reward))
+        summaries_collector.write_test_episode_summaries(
+            sess, global_step, test_episodes, test_successful_episodes, test_collision_episodes,
+            test_max_len_episodes
+        )
+        test_results.append((global_step, episodes, test_successful_episodes))
+        # see if best
+        rate = test_successful_episodes / float(test_episodes)
+        if best_model_test_success_rate < rate:
+            if print_messages:
+                print 'new best model found at step {}'.format(global_step)
+                print 'old success rate {} new success rate {}'.format(best_model_test_success_rate, rate)
+            is_best = True
+            best_model_global_step = global_step
+            best_model_test_success_rate = rate
+        else:
+            is_best = False
+            if print_messages:
+                print 'best model still at step {}'.format(best_model_global_step)
+        return is_best, best_model_global_step, best_model_test_success_rate
+
     regular_episode_editor = EpisodeEditor(config['model']['alter_episode'], pre_trained_reward)
     motion_planner_episode_editor = EpisodeEditor(2, pre_trained_reward)
 
@@ -172,19 +203,10 @@ def run_for_config(config, print_messages):
             pre_trained_reward.load_weights(sess)
         network.update_target_networks(sess)
 
-        trajectory_eval = TrajectoryEval(config, rollout_manager, completed_trajectories_dir)
-
         global_step = 0
         total_episodes = episodes = successful_episodes = collision_episodes = max_len_episodes = 0
-        test_episodes = test_successful_episodes = 0
         best_model_global_step, best_model_test_success_rate = -1, -1.0
         for update_index in range(config['general']['updates_cycle_count']):
-            allowed_size, has_changed = curriculum_manager.get_next_parameters(test_episodes, test_successful_episodes)
-            # allowed_size, has_changed = curriculum_manager.get_next_parameters(episodes, successful_episodes)
-            if has_changed:
-                test_episodes = test_successful_episodes = 0
-                # episodes = successful_episodes = collision_episodes = max_len_episodes = 0
-
             # collect data
             a = datetime.datetime.now()
             rollout_manager.set_policy_weights(network.get_actor_online_weights(sess))
@@ -260,42 +282,19 @@ def run_for_config(config, print_messages):
                 print 'update took: {}'.format(b - a)
 
             # test if needed
-            is_best = False
             if update_index % config['test']['test_every_cycles'] == 0:
-                rollout_manager.set_policy_weights(network.get_actor_online_weights(sess))
-                eval_result = trajectory_eval.eval(global_step, allowed_size)
-                test_episodes = eval_result[0]
-                test_successful_episodes = eval_result[1]
-                test_collision_episodes = eval_result[2]
-                test_max_len_episodes = eval_result[3]
-                test_mean_reward = eval_result[4]
-                if print_messages:
-                    print('test path allowed length {}'.format(allowed_size))
-                    print_state('test', test_episodes, test_successful_episodes, test_collision_episodes,
-                                test_max_len_episodes)
-                    print('test mean total reward {}'.format(test_mean_reward))
-                summaries_collector.write_test_episode_summaries(
-                    sess, global_step, test_episodes, test_successful_episodes, test_collision_episodes,
-                    test_max_len_episodes
-                )
-                summaries_collector.write_test_curriculum_summaries(sess, global_step, allowed_size)
-                test_results.append((global_step, episodes, test_successful_episodes, allowed_size))
-                # see if best
-                rate = test_successful_episodes / float(test_episodes)
-                if best_model_test_success_rate < rate:
-                    print 'new best model found at step {}'.format(global_step)
-                    print 'old success rate {} new success rate {}'.format(best_model_test_success_rate, rate)
-                    is_best = True
-                    best_model_global_step = global_step
-                    best_model_test_success_rate = rate
-                else:
-                    print 'best model still at step {}'.format(best_model_global_step)
-
+                is_best, best_model_global_step, best_model_test_success_rate = do_test(
+                    sess, best_model_global_step, best_model_test_success_rate)
+                if is_best:
+                    saver.save(sess, os.path.join(saver_dir, 'best'), global_step=global_step)
             if update_index % config['general']['save_model_every_cycles'] == 0:
                 saver.save(sess, os.path.join(saver_dir, 'last_iteration'), global_step=global_step)
-            if is_best:
-                saver.save(sess, os.path.join(saver_dir, 'best'), global_step=global_step)
 
+        # final test at the end
+        is_best, best_model_global_step, best_model_test_success_rate = do_test(
+            sess, best_model_global_step, best_model_test_success_rate)
+        if is_best:
+            saver.save(sess, os.path.join(saver_dir, 'best'), global_step=global_step)
     last_message = 'best model stats at step {} has success rate of {}'.format(
         best_model_global_step, best_model_test_success_rate)
     print last_message

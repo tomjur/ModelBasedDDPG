@@ -61,14 +61,6 @@ hindsight:
   score_with_reward_model: True
 #  score_with_reward_model: False
 
-curriculum:
-  enable: False
-#  enable: True
-  initial_length: 0.1
-  length_increments: 0.02
-  success_rate_increase: 0.8
-  minimal_episodes: 10
-
 actor:
   learning_rate: 0.001
 #  gradient_limit: 0.0
