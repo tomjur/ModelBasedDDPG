@@ -88,7 +88,7 @@ while collected < len(collection_queries):
         if len(workspace_buffer) >= samples_per_file:
             current_buffer = workspace_buffer[:samples_per_file]
             current_offset = params_ids_to_offset[workspace_id]
-            dump_path = os.path.join(results_dir, '{}_{}.pkl'.format(workspace_id, current_offset))
+            dump_path = os.path.join(results_dir, '{}_{}.path_pkl'.format(workspace_id, current_offset))
             compressed_file = bz2.BZ2File(dump_path, 'w')
             pickle.dump(current_buffer, compressed_file)
             compressed_file.close()
