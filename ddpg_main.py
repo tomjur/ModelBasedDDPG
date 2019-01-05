@@ -30,8 +30,10 @@ def run_for_config(config, print_messages):
     random.seed(random_seed)
     tf.set_random_seed(random_seed)
 
-    # where we save all the outputs
-    working_dir = os.getcwd()
+    # where we save all the outputs (outputs will be saved according to the scenario)
+    working_dir = os.path.join(os.getcwd(), config['general']['scenario'])
+    if not os.path.exists(working_dir):
+        os.makedirs(working_dir)
     saver_dir = os.path.join(working_dir, 'models', model_name)
     if not os.path.exists(saver_dir):
         os.makedirs(saver_dir)
