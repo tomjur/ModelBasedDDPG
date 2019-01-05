@@ -49,8 +49,8 @@ config['openrave_rl']['challenging_trajectories_only'] = True
 # threads = 3
 # results_dir = 'imitation_data_vision_temp_to_delete'
 
-number_of_samples_per_workspace = 1000
-samples_per_file = 1000
+number_of_samples_per_workspace = 50
+samples_per_file = 50
 threads = 100
 results_dir = 'imitation_data'
 
