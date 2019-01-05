@@ -13,6 +13,61 @@ from openrave_manager import OpenraveManager
 from potential_point import PotentialPoint
 
 
+class RewardDataLoader:
+    def __init__(self, data_dir, max_read=None, is_vision=False):
+        assert os.path.exists(data_dir)
+        files = [file for file in os.listdir(data_dir) if file.endswith(".pkl")]
+        assert len(files) > 0
+        self.data_dir = data_dir
+        self.files = files
+        self.max_read = max_read
+        self.is_vision = is_vision
+
+        self.first_iteration_done = False
+
+    def __iter__(self):
+        random.shuffle(self.files)
+        files_to_keep = []
+        row_counter = 0
+        result = []
+        for f in self.files:
+            compressed_file = bz2.BZ2File(os.path.join(self.data_dir, f), 'r')
+            result = pickle.load(compressed_file)
+            compressed_file.close()
+            if self.is_vision:
+                parts = f.split('_')
+                workspace_id = '{}_{}.pkl'.format(parts[0], parts[1])
+                result = [tuple([workspace_id] + list(t)) for t in result]
+            row_counter += len(result)
+            if not self.first_iteration_done and self.max_read is not None:
+                files_to_keep.append(f)
+                if row_counter > self.max_read:
+                    break
+            yield result
+            result = []
+        if not self.first_iteration_done:
+            self.first_iteration_done = True
+            if self.max_read is not None:
+                self.files = files_to_keep
+        yield result
+
+
+class Batcher:
+    def __init__(self, input_iterator, batch_size):
+        self.input_iterator = input_iterator
+        self.batch_size = batch_size
+
+    def __iter__(self):
+        current_batch = []
+        for tuple_list in self.input_iterator:
+            for t in tuple_list:
+                current_batch.append(t)
+                if len(current_batch) == self.batch_size:
+                    yield current_batch
+                    current_batch = []
+        yield current_batch
+
+
 model_name = datetime.datetime.fromtimestamp(time.time()).strftime('%Y_%m_%d_%H_%M_%S')
 
 # read the config
@@ -39,20 +94,22 @@ image_cache = None
 if scenario == 'vision':
     params_dir = os.path.abspath(os.path.expanduser('~/ModelBasedDDPG/scenario_params/vision/'))
     image_cache = ImageCache(params_dir)
-# train = load_data_from(os.path.join(base_data_dir, 'train'), 10000, scenario == 'vision')
-# test = load_data_from(os.path.join(base_data_dir, 'test'), 10000, scenario == 'vision')
-train = load_data_from(os.path.join(base_data_dir, 'train'), is_vision=scenario == 'vision')
-test = load_data_from(os.path.join(base_data_dir, 'test'), is_vision=scenario == 'vision')
+# train = RewardDataLoader(os.path.join(base_data_dir, 'train'), max_read=10000, is_vision=scenario == 'vision')
+# test = RewardDataLoader(os.path.join(base_data_dir, 'test'), max_read=10000, is_vision=scenario == 'vision')
+train = RewardDataLoader(os.path.join(base_data_dir, 'train'), is_vision=scenario == 'vision')
+test = RewardDataLoader(os.path.join(base_data_dir, 'test'), is_vision=scenario == 'vision')
 
 
 def describe_data(data_collection):
-    data_status = [t[-1] for t in data_collection]
+    data_status = []
+    for tuple_list in data_collection:
+        data_status.extend([t[-1] for t in tuple_list])
     free_status = len([s for s in data_status if s == 1])
     collision_status = len([s for s in data_status if s == 2])
     goal_status = len([s for s in data_status if s == 3])
-    print 'free: {} ({})'.format(free_status, float(free_status)/len(data_collection))
-    print 'collision: {} ({})'.format(collision_status, float(collision_status)/len(data_collection))
-    print 'goal: {} ({})'.format(goal_status, float(goal_status)/len(data_collection))
+    print 'free: {} ({})'.format(free_status, float(free_status)/len(data_status))
+    print 'collision: {} ({})'.format(collision_status, float(collision_status)/len(data_status))
+    print 'goal: {} ({})'.format(goal_status, float(goal_status)/len(data_status))
     print ''
 
 
@@ -150,6 +207,9 @@ test_summaries = tf.summary.merge([
     tf.summary.scalar('other_accuracy', other_accuracy_input),
 ])
 
+train_batcher = Batcher(train, batch_size)
+test_batcher = Batcher(test, test_batch_size)
+
 with tf.Session(
         config=tf.ConfigProto(
             gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=config['general']['gpu_usage'])
@@ -159,11 +219,8 @@ with tf.Session(
     current_global_step = 0
     for epoch in range(epochs):
         # run train for one epoch
-        random.shuffle(train)
-        data_index = 0
-        while data_index < len(train):
-            train_batch = oversample_batch(train, data_index, batch_size, oversample_large_magnitude=True)
-            data_index += batch_size
+        for raw_train_batch in train_batcher:
+            train_batch = oversample_batch(raw_train_batch, oversample_large_magnitude=True)
             if train_batch is None:
                 continue
             train_batch, train_rewards, train_status = get_batch_and_labels(train_batch, openrave_manager, image_cache)
@@ -184,8 +241,10 @@ with tf.Session(
 
         if current_global_step > 0:
             # run test for one (random) batch
-            random.shuffle(test)
-            test_batch = oversample_batch(test, 0, test_batch_size, oversample_large_magnitude=False)
+            test_batch = None
+            for raw_test_batch in test_batcher:
+                test_batch = oversample_batch(raw_test_batch, oversample_large_magnitude=False)
+                break
             test_batch, test_rewards, test_status = get_batch_and_labels(test_batch, openrave_manager, image_cache)
             test_feed = pre_trained_reward.make_feed(*test_batch)
             test_feed[reward_input] = np.expand_dims(np.array(test_rewards), axis=1)

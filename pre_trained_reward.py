@@ -139,8 +139,7 @@ class PreTrainedReward:
         return feed
 
 
-def oversample_batch(data_collection, data_index, batch_size, oversample_large_magnitude=False):
-    current_batch = data_collection[data_index:data_index + batch_size]
+def oversample_batch(current_batch, oversample_large_magnitude=False):
     if not oversample_large_magnitude:
         return current_batch
     status = [b[-1] for b in current_batch]
