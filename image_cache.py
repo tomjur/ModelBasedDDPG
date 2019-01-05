@@ -2,6 +2,7 @@ import Image
 import matplotlib.pyplot as plt
 import os
 import numpy as np
+import cPickle as pickle
 
 from workspace_generation_utils import WorkspaceParams
 
@@ -27,7 +28,13 @@ class ImageCache:
                 params = WorkspaceParams.load_from_file(full_file_path)
                 np_array = None
                 if create_images:
-                    np_array = self._get_image_as_numpy(params)
+                    image_filename = filename.replace('.pkl', '.image_pkl')
+                    full_image_file_path = os.path.join(source_dir, image_filename)
+                    if os.path.isfile(full_image_file_path):
+                        np_array = pickle.load(open(full_image_file_path, 'r'))
+                    else:
+                        np_array = self._get_image_as_numpy(params)
+                        pickle.dump(np_array, open(full_image_file_path, 'w'))
 
                 self.items[filename] = ImageCacheItem(filename, full_file_path, params, np_array)
 
@@ -75,3 +82,8 @@ class ImageCache:
         res = np.asarray(im)
         plt.clf()
         return res
+
+
+if __name__ == '__main__':
+    path = '~/ModelBasedDDPG/scenario_params/vision'
+    ImageCache(path, True)
