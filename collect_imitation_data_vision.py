@@ -58,7 +58,7 @@ if not os.path.exists(results_dir):
     os.makedirs(results_dir)
 
 params_dir = os.path.abspath(os.path.expanduser('~/ModelBasedDDPG/scenario_params/vision/'))
-image_cache = ImageCache(params_dir)
+image_cache = ImageCache(params_dir, create_images=False)
 collection_queries = []
 workspace_ids = []
 for cache_item in image_cache.items.values():
