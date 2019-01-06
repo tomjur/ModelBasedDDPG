@@ -78,6 +78,6 @@ write_to_log('number of workspaces: {}'.format(len(workspace_serial_to_count)))
 write_to_log('minimal workspace serial is {}'.format(min(workspace_serial_to_count.keys())))
 write_to_log('maximal workspace serial is {}'.format(max(workspace_serial_to_count.keys())))
 write_to_log('avg count per workspace is {}'.format(
-    sum(workspace_serial_to_count.values()) / len(workspace_serial_to_count)))
+    sum(workspace_serial_to_count.values()) / float(len(workspace_serial_to_count))))
 log_file.close()
 print 'done'
