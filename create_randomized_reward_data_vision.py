@@ -31,9 +31,6 @@ def write_to_log(message):
     log_file.flush()
 
 
-if not os.path.exists(new_dir):
-    os.makedirs(new_dir)
-
 output_file_index = 0
 input_file_index = 0
 data = []
@@ -41,6 +38,8 @@ entire_data_length = 0
 workspace_serial_to_count = {}
 for dirpath, dirnames, filenames in os.walk(source_dir):
     for filename in filenames:
+        if not filename.endswith('.pkl'):
+            continue
         name_parts = filename.split('_')
         workspace_id = '{}_{}.pkl'.format(name_parts[0], name_parts[1])
         compressed_file = bz2.BZ2File(os.path.join(source_dir, filename), 'r')
