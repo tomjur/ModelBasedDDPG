@@ -8,6 +8,8 @@ source_dir = os.path.expanduser('~/ModelBasedDDPG/supervised_data/vision/train')
 new_dir = os.path.expanduser('~/ModelBasedDDPG/supervised_data/vision_shuffled/train')
 samples_per_new_file = 1000
 
+log_file = open(os.path.join(new_dir, 'creation_log.txt'), 'w')
+
 
 def write_chunk(entire_buffer, file_index):
     random.shuffle(entire_buffer)
@@ -18,6 +20,12 @@ def write_chunk(entire_buffer, file_index):
     pickle.dump(data_to_write, compressed_file)
     compressed_file.close()
     return entire_buffer
+
+
+def write_to_log(message):
+    print message
+    log_file.write('{}{}'.format(message, os.linesep))
+    log_file.flush()
 
 
 if not os.path.exists(new_dir):
@@ -53,17 +61,20 @@ for dirpath, dirnames, filenames in os.walk(source_dir):
 
 while len(data) > 0:
     if len(data) < samples_per_new_file:
-        print 'warning: last file is not complete, choose a file size that is a multiplier of the number of elements!'
-        print 'number of elements: {}, file size {}'.format(entire_data_length, samples_per_new_file)
+        write_to_log(
+            'warning: last file is not complete, choose a file size that is a multiplier of the number of elements!')
+        write_to_log('number of elements: {}, file size {}'.format(entire_data_length, samples_per_new_file))
     data = write_chunk(data, output_file_index)
     output_file_index += 1
     print 'writing leftover data. output files produced {}'.format(output_file_index)
 
 for workspace_serial in workspace_serial_to_count:
-    print 'workspace {} has {} entries'.format(workspace_serial, workspace_serial_to_count[workspace_serial])
+    write_to_log('workspace {} has {} entries'.format(workspace_serial, workspace_serial_to_count[workspace_serial]))
 
-print 'number of workspaces: {}'.format(len(workspace_serial_to_count))
-print 'minimal workspace serial is {}'.format(min(workspace_serial_to_count.keys()))
-print 'maximal workspace serial is {}'.format(max(workspace_serial_to_count.keys()))
-print 'avg count per workspace is {}'.format(sum(workspace_serial_to_count.values()) / len(workspace_serial_to_count))
+write_to_log('number of workspaces: {}'.format(len(workspace_serial_to_count)))
+write_to_log('minimal workspace serial is {}'.format(min(workspace_serial_to_count.keys())))
+write_to_log('maximal workspace serial is {}'.format(max(workspace_serial_to_count.keys())))
+write_to_log('avg count per workspace is {}'.format(
+    sum(workspace_serial_to_count.values()) / len(workspace_serial_to_count)))
+log_file.close()
 print 'done'
