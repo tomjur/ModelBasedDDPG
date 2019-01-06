@@ -4,9 +4,12 @@ import random
 import cPickle as pickle
 
 
-source_dir = os.path.expanduser('~/ModelBasedDDPG/supervised_data/vision/train')
-new_dir = os.path.expanduser('~/ModelBasedDDPG/supervised_data/vision_shuffled/train')
+source_dir = os.path.expanduser('~/ModelBasedDDPG/supervised_data/vision/test')
+new_dir = os.path.expanduser('~/ModelBasedDDPG/supervised_data/vision_shuffled/test')
 samples_per_new_file = 1000
+
+if not os.path.exists(new_dir):
+    os.makedirs(new_dir)
 
 log_file = open(os.path.join(new_dir, 'creation_log.txt'), 'w')
 
