@@ -74,14 +74,15 @@ yaml.dump(config, open(config_copy_path, 'w'))
 pre_trained_reward = PreTrainedReward(model_name, config)
 reward_prediction = pre_trained_reward.reward_prediction
 reward_input = tf.placeholder(tf.float32, [None, 1])
-reward_loss = tf.reduce_mean(tf.square(reward_input - reward_prediction))
+# reward_loss = tf.reduce_mean(tf.square(reward_input - reward_prediction))
+reward_loss = tf.losses.mean_squared_error(labels=reward_input, predictions=reward_prediction)
 status_prediction = pre_trained_reward.status_softmax_logits
 status_input = tf.placeholder(tf.int32, [None, ])
-status_loss = tf.reduce_mean(
-    tf.nn.sparse_softmax_cross_entropy_with_logits(
-        labels=status_input-1, logits=pre_trained_reward.status_softmax_logits
-    )
-) * config['reward']['cross_entropy_coefficient']
+# status_loss = tf.reduce_mean(
+#     tf.nn.sparse_softmax_cross_entropy_with_logits(labels=status_input-1, logits=status_prediction)
+# ) * config['reward']['cross_entropy_coefficient']
+status_loss = tf.losses.sparse_softmax_cross_entropy(labels=status_input-1, logits=status_prediction) * config[
+    'reward']['cross_entropy_coefficient']
 regularization_loss = tf.losses.get_regularization_loss()
 total_loss = reward_loss + status_loss + regularization_loss
 
