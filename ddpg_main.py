@@ -9,6 +9,7 @@ import numpy as np
 
 from episode_editor import EpisodeEditor
 from hindsight_policy import HindsightPolicy
+from image_cache import ImageCache
 from network import Network
 from replay_buffer import ReplayBuffer
 from rollout_manager import FixedRolloutManager
@@ -31,7 +32,8 @@ def run_for_config(config, print_messages):
     tf.set_random_seed(random_seed)
 
     # where we save all the outputs (outputs will be saved according to the scenario)
-    working_dir = os.path.join(os.getcwd(), config['general']['scenario'])
+    scenario = config['general']['scenario']
+    working_dir = os.path.join(os.getcwd(), scenario)
     if not os.path.exists(working_dir):
         os.makedirs(working_dir)
     saver_dir = os.path.join(working_dir, 'models', model_name)
@@ -40,6 +42,11 @@ def run_for_config(config, print_messages):
     config_copy_path = os.path.join(working_dir, 'models', model_name, 'config.yml')
     summaries_dir = os.path.join(working_dir, 'tensorboard', model_name)
     completed_trajectories_dir = os.path.join(working_dir, 'trajectories', model_name)
+
+    # load images if required
+    image_cache = None
+    if scenario == 'vision':
+        image_cache = ImageCache(config['general']['params_file'], create_images=True)
 
     # load pretrained model if required
     pre_trained_reward = None
@@ -57,6 +64,7 @@ def run_for_config(config, print_messages):
         return joints, poses, jacobians
 
     def score_for_hindsight(augmented_buffer):
+        assert scenario != 'vision'
         # unzip
         goal_pose_list, goal_joints_list, workspace_image_list, current_state_list, action_used_list, _, is_goal_list,\
         __ = zip(*augmented_buffer)
@@ -84,7 +92,7 @@ def run_for_config(config, print_messages):
     saver = tf.train.Saver(max_to_keep=4, save_relative_paths=saver_dir)
     yaml.dump(config, open(config_copy_path, 'w'))
     summaries_collector = SummariesCollector(summaries_dir, model_name)
-    rollout_manager = FixedRolloutManager(config)
+    rollout_manager = FixedRolloutManager(config, image_cache=image_cache)
     trajectory_eval = TrajectoryEval(config, rollout_manager, completed_trajectories_dir)
 
     test_results = []
@@ -94,11 +102,14 @@ def run_for_config(config, print_messages):
         gamma = config['model']['gamma']
         replay_buffer_batch = replay_buffer.sample_batch(batch_size)
 
-        goal_pose, goal_joints, workspace_image, current_state, action, reward, terminated, next_state = \
+        goal_pose, goal_joints, workspace_id, current_state, action, reward, terminated, next_state = \
             replay_buffer_batch
 
-        current_joints, current_poses, current_jacobians = unpack_state_batch(current_state)
-        next_joints, next_poses, next_jacobians = unpack_state_batch(next_state)
+        # get image from image cache
+        workspace_image = [image_cache.get_image(k) for k in workspace_id]
+
+        current_joints, _, __ = unpack_state_batch(current_state)
+        next_joints, _, __ = unpack_state_batch(next_state)
 
         # get the predicted q value of the next state (action is taken from the target policy)
         next_state_action_target_q = network.predict_policy_q(
@@ -147,7 +158,8 @@ def run_for_config(config, print_messages):
         )
 
     def process_example_trajectory(episode_example_trajectory, episode_agent_trajectory):
-        _, __, ___, ____, goal_pose, goal_joints, workspace_image = episode_agent_trajectory
+        # creates an episode by computing the actions, and setting the rewards to None (will be calculated later)
+        _, __, ___, ____, goal_pose, goal_joints, workspace_id = episode_agent_trajectory
         example_trajectory, example_trajectory_poses = episode_example_trajectory
         example_trajectory = [j[1:] for j in example_trajectory]
         # goal reached always
@@ -159,7 +171,7 @@ def run_for_config(config, print_messages):
                    for i in range(len(example_trajectory)-1)]
         actions = [a / max(np.linalg.norm(a), 0.00001) for a in actions]
         rewards = [None] * len(actions)
-        return status, states, actions, rewards, goal_pose, goal_joints, workspace_image
+        return status, states, actions, rewards, goal_pose, goal_joints, workspace_id
 
     def do_test(sess, best_model_global_step, best_model_test_success_rate):
         rollout_manager.set_policy_weights(network.get_actor_weights(sess, is_online=False), is_online=False)

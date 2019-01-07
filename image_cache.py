@@ -18,6 +18,7 @@ class ImageCacheItem:
 class ImageCache:
     def __init__(self, params_directory, create_images=True):
         self.items = {}
+        self._create_images = create_images
 
         source_dir = os.path.expanduser(params_directory)
         for dirpath, dirnames, filenames in os.walk(source_dir):
@@ -37,6 +38,10 @@ class ImageCache:
                         pickle.dump(np_array, open(full_image_file_path, 'w'))
 
                 self.items[filename] = ImageCacheItem(filename, full_file_path, params, np_array)
+
+    def get_image(self, workspace_id):
+        assert self._create_images
+        return self.items[workspace_id].np_array
 
     @staticmethod
     def _figure_to_nparray(fig):

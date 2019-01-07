@@ -12,7 +12,6 @@ import time
 
 from network import Network
 from openrave_rl_interface import OpenraveRLInterface
-from workspace_generation_utils import WorkspaceParams
 
 
 class RandomQueryCollectorProcess(multiprocessing.Process):
@@ -110,6 +109,7 @@ class ActorProcess(multiprocessing.Process):
         self.actor_specific_queue = actor_specific_queue
         self.config = config
         self.image_cache = image_cache
+        self.use_vision = image_cache is not None
         # members to set at runtime
         self.openrave_interface = None
         self.actor = None
@@ -139,12 +139,12 @@ class ActorProcess(multiprocessing.Process):
     def _run_episode(self, sess, query_params, is_train):
         trajectory = query_params[0]
         trajectory_poses = query_params[1]
-        if len(query_params) > 2:
+        if self.use_vision:
             # if we are doing multiple workspaces needs to load the correct one from the cache
-            self.openrave_interface.openrave_manager.remove_objects()
-            workspace_params_file = query_params[2]
-            params = self.image_cache.params[workspace_params_file]
-            self.openrave_interface.openrave_manager.load_params(params)
+            workspace_id = query_params[2]
+            self.openrave_interface.openrave_manager.set_params(self.image_cache[workspace_id].full_filename)
+        else:
+            workspace_id = None
 
         # the trajectory data structures to return
         start_episode_time = datetime.datetime.now()
@@ -188,9 +188,8 @@ class ActorProcess(multiprocessing.Process):
         end_episode_time = datetime.datetime.now()
         find_trajectory_time = start_rollout_time - start_episode_time
         rollout_time = end_episode_time-start_rollout_time
-        workspace_image = None
 
-        episode_agent_trajectory = (status, states, actions, rewards, goal_pose, goal_joints, workspace_image)
+        episode_agent_trajectory = (status, states, actions, rewards, goal_pose, goal_joints, workspace_id)
         episode_times = (find_trajectory_time, rollout_time)
         episode_example_trajectory = (trajectory, trajectory_poses)
         return episode_agent_trajectory, episode_times, episode_example_trajectory
