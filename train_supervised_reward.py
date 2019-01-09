@@ -14,14 +14,13 @@ from potential_point import PotentialPoint
 
 
 class RewardDataLoader:
-    def __init__(self, data_dir, max_read=None, is_vision=False):
+    def __init__(self, data_dir, max_read=None):
         assert os.path.exists(data_dir)
         files = [file for file in os.listdir(data_dir) if file.endswith(".pkl")]
         assert len(files) > 0
         self.data_dir = data_dir
         self.files = files
         self.max_read = max_read
-        self.is_vision = is_vision
 
         self.first_iteration_done = False
 
@@ -34,10 +33,6 @@ class RewardDataLoader:
             compressed_file = bz2.BZ2File(os.path.join(self.data_dir, f), 'r')
             result = pickle.load(compressed_file)
             compressed_file.close()
-            if self.is_vision:
-                parts = f.split('_')
-                workspace_id = '{}_{}.pkl'.format(parts[0], parts[1])
-                result = [tuple([workspace_id] + list(t)) for t in result]
             row_counter += len(result)
             if not self.first_iteration_done and self.max_read is not None:
                 files_to_keep.append(f)
@@ -99,10 +94,10 @@ image_cache = None
 if scenario == 'vision':
     params_dir = os.path.abspath(os.path.expanduser('~/ModelBasedDDPG/scenario_params/vision/'))
     image_cache = ImageCache(params_dir)
-train = RewardDataLoader(os.path.join(base_data_dir, 'train'), max_read=80000, is_vision=scenario == 'vision')
-test = RewardDataLoader(os.path.join(base_data_dir, 'test'), max_read=80000, is_vision=scenario == 'vision')
-# train = RewardDataLoader(os.path.join(base_data_dir, 'train'), is_vision=scenario == 'vision')
-# test = RewardDataLoader(os.path.join(base_data_dir, 'test'), is_vision=scenario == 'vision')
+train = RewardDataLoader(os.path.join(base_data_dir, 'train'), max_read=80000)
+test = RewardDataLoader(os.path.join(base_data_dir, 'test'), max_read=80000)
+# train = RewardDataLoader(os.path.join(base_data_dir, 'train'))
+# test = RewardDataLoader(os.path.join(base_data_dir, 'test'))
 
 
 def describe_data(data_collection):
