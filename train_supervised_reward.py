@@ -53,9 +53,10 @@ class RewardDataLoader:
 
 
 class Batcher:
-    def __init__(self, input_iterator, batch_size):
+    def __init__(self, input_iterator, batch_size, shuffle_before_yield):
         self.input_iterator = input_iterator
         self.batch_size = batch_size
+        self.shuffle_before_yield = shuffle_before_yield
 
     def __iter__(self):
         current_batch = []
@@ -63,8 +64,12 @@ class Batcher:
             for t in tuple_list:
                 current_batch.append(t)
                 if len(current_batch) == self.batch_size:
+                    if self.shuffle_before_yield:
+                        random.shuffle(current_batch)
                     yield current_batch
                     current_batch = []
+        if self.shuffle_before_yield:
+            random.shuffle(current_batch)
         yield current_batch
 
 
@@ -94,10 +99,10 @@ image_cache = None
 if scenario == 'vision':
     params_dir = os.path.abspath(os.path.expanduser('~/ModelBasedDDPG/scenario_params/vision/'))
     image_cache = ImageCache(params_dir)
-# train = RewardDataLoader(os.path.join(base_data_dir, 'train'), max_read=10000, is_vision=scenario == 'vision')
-# test = RewardDataLoader(os.path.join(base_data_dir, 'test'), max_read=10000, is_vision=scenario == 'vision')
-train = RewardDataLoader(os.path.join(base_data_dir, 'train'), is_vision=scenario == 'vision')
-test = RewardDataLoader(os.path.join(base_data_dir, 'test'), is_vision=scenario == 'vision')
+train = RewardDataLoader(os.path.join(base_data_dir, 'train'), max_read=80000, is_vision=scenario == 'vision')
+test = RewardDataLoader(os.path.join(base_data_dir, 'test'), max_read=80000, is_vision=scenario == 'vision')
+# train = RewardDataLoader(os.path.join(base_data_dir, 'train'), is_vision=scenario == 'vision')
+# test = RewardDataLoader(os.path.join(base_data_dir, 'test'), is_vision=scenario == 'vision')
 
 
 def describe_data(data_collection):
@@ -207,8 +212,9 @@ test_summaries = tf.summary.merge([
     tf.summary.scalar('other_accuracy', other_accuracy_input),
 ])
 
-train_batcher = Batcher(train, batch_size)
-test_batcher = Batcher(test, test_batch_size)
+shuffle_batch_multiplier = 100
+train_batcher = Batcher(Batcher(train, batch_size * shuffle_batch_multiplier, True), batch_size, False)
+test_batcher = Batcher(Batcher(test, test_batch_size * shuffle_batch_multiplier, True), test_batch_size, False)
 
 with tf.Session(
         config=tf.ConfigProto(
