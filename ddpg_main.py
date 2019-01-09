@@ -106,7 +106,9 @@ def run_for_config(config, print_messages):
             replay_buffer_batch
 
         # get image from image cache
-        workspace_image = [image_cache.get_image(k) for k in workspace_id]
+        workspace_image = None
+        if image_cache is not None:
+            workspace_image = [image_cache.get_image(k) for k in workspace_id]
 
         current_joints, _, __ = unpack_state_batch(current_state)
         next_joints, _, __ = unpack_state_batch(next_state)
@@ -206,8 +208,9 @@ def run_for_config(config, print_messages):
                 print 'best model still at step {}'.format(best_model_global_step)
         return is_best, best_model_global_step, best_model_test_success_rate
 
-    regular_episode_editor = EpisodeEditor(config['model']['alter_episode'], pre_trained_reward)
-    motion_planner_episode_editor = EpisodeEditor(2, pre_trained_reward)
+    regular_episode_editor = EpisodeEditor(
+        config['model']['alter_episode'], pre_trained_reward, image_cache=image_cache)
+    motion_planner_episode_editor = EpisodeEditor(2, pre_trained_reward, image_cache=image_cache)
 
     with tf.Session(
             config=tf.ConfigProto(
@@ -220,7 +223,7 @@ def run_for_config(config, print_messages):
         network.update_target_networks(sess)
 
         global_step = 0
-        total_episodes = episodes = successful_episodes = collision_episodes = max_len_episodes = 0
+        episodes = successful_episodes = collision_episodes = max_len_episodes = 0
         best_model_global_step, best_model_test_success_rate = -1, -1.0
         for update_index in range(config['general']['updates_cycle_count']):
             # collect data
@@ -268,7 +271,6 @@ def run_for_config(config, print_messages):
             # compute counters
             for altered_episode in altered_episodes:
                 status = altered_episode[0]
-                total_episodes += 1
                 episodes += 1
                 if status == 1:
                     max_len_episodes += 1
