@@ -208,9 +208,13 @@ def run_for_config(config, print_messages):
                 print 'best model still at step {}'.format(best_model_global_step)
         return is_best, best_model_global_step, best_model_test_success_rate
 
+    allowed_batch_episode_editor = config['model']['batch_size'] if scenario == 'vision' else None
     regular_episode_editor = EpisodeEditor(
-        config['model']['alter_episode'], pre_trained_reward, image_cache=image_cache)
-    motion_planner_episode_editor = EpisodeEditor(2, pre_trained_reward, image_cache=image_cache)
+        config['model']['alter_episode'], pre_trained_reward, image_cache=image_cache,
+        allowed_batch=allowed_batch_episode_editor
+    )
+    motion_planner_episode_editor = EpisodeEditor(
+        2, pre_trained_reward, image_cache=image_cache, allowed_batch=allowed_batch_episode_editor)
 
     with tf.Session(
             config=tf.ConfigProto(

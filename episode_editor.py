@@ -3,7 +3,7 @@ import numpy as np
 
 class EpisodeEditor:
     def __init__(self, alter_episode_mode, pre_trained_reward, image_cache, joints_dimension=4, pose_dimension=2,
-                 status_dimension=3, image_dimension=(55, 111)):
+                 status_dimension=3, image_dimension=(55, 111), allowed_batch=None):
         self.alter_episode_mode = alter_episode_mode
         self.pre_trained_reward = pre_trained_reward
         self.image_cache = image_cache
@@ -11,6 +11,7 @@ class EpisodeEditor:
         self.pose_dimension = pose_dimension
         self.status_dimension = status_dimension
         self.image_dimension = image_dimension
+        self.allowed_batch = allowed_batch
 
         self.current_joints_buffer = None
         self.goal_joints_buffer = None
@@ -39,6 +40,30 @@ class EpisodeEditor:
         if self.images_buffer is not None:
             self.images_buffer = np.append(self.images_buffer, images, axis=0)
 
+    def _predict_buffers_by_batches(self, sess):
+        if self.allowed_batch is None:
+            # predict for all the episodes in the same time
+            return self.pre_trained_reward.make_prediction(
+                sess, self.current_joints_buffer, self.goal_joints_buffer, self.actions_buffer, self.goal_poses_buffer,
+                self.status_buffer, images=self.images_buffer
+            )
+        current_index = 0
+        fake_rewards, fake_status_prob = [], []
+        while current_index <= len(self.current_joints_buffer):
+            current_prediction_result = self.pre_trained_reward.make_prediction(
+                sess,
+                self.current_joints_buffer[current_index: self.allowed_batch],
+                self.goal_joints_buffer[current_index: self.allowed_batch],
+                self.actions_buffer[current_index: self.allowed_batch],
+                self.goal_poses_buffer[current_index: self.allowed_batch],
+                self.status_buffer[current_index: self.allowed_batch],
+                images=self.images_buffer[current_index: self.allowed_batch]
+            )
+            current_index += self.allowed_batch
+            fake_rewards.extend(current_prediction_result[0])
+            fake_status_prob.extend(current_prediction_result[1])
+        return fake_rewards, fake_status_prob
+
     def process_episodes(self, episodes, sess):
         # no alteration
         if self.alter_episode_mode == 0:
@@ -64,11 +89,9 @@ class EpisodeEditor:
                 images = [image] * len(actions)
             self._append_to_buffers(current_joints, [goal_joints] * len(actions), actions, [goal_pose] * len(actions),
                                     one_hot_status, images)
-        # predict for all the episodes in the same time
-        fake_rewards, fake_status_prob = self.pre_trained_reward.make_prediction(
-            sess, self.current_joints_buffer, self.goal_joints_buffer, self.actions_buffer, self.goal_poses_buffer,
-            self.status_buffer, images=self.images_buffer
-        )
+        # get the results by batch:
+        fake_rewards, fake_status_prob = self._predict_buffers_by_batches(sess)
+
         # partition the results by episode
         resulting_episodes = []
         for episode_start_index, episode_agent_trajectory in zip(episode_start_indices, episodes):
