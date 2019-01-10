@@ -22,7 +22,6 @@ model:
   batch_size: 2000  # with images
 #  batch_size: 10240
   potential_points: [2, 0., 0.075, 3, 0., 0.085, 4, -0.02, 0.05, 4, 0.005, 0.05, 5, 0.005, 0.035, 5, -0.02, 0.035]
-  consider_image: False
   consider_goal_pose: True
 
 reward:
@@ -34,9 +33,6 @@ reward:
   gradient_limit: 5.0
 #  gradient_limit: 0.0
   layers: [50, 50, 50]
-#  layers: [100, 100, 100]
-#  layers: [50, 50, 50, 50]
-#  layers: [100, 100, 100, 100]
   l2_regularization_coefficient: 0.0001
   cross_entropy_coefficient: 1.0
   activation: 'elu'
