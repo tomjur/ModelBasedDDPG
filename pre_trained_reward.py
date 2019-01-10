@@ -77,7 +77,7 @@ class PreTrainedReward:
             (clipped_next_joints, self._generate_goal_features(goal_joints_inputs, goal_pose_inputs)), axis=1)
         # add vision if needed
         if self.is_vision_enabled:
-            visual_inputs = DqnModel.predict(images_3d)
+            visual_inputs = DqnModel(name_prefix).predict(images_3d, self._reuse_flag)
             current = tf.concat((current, visual_inputs), axis=1)
         for i, layer_size in enumerate(layers):
             _activation = None if i == len(layers) - 1 else get_activation(self.config['reward']['activation'])
@@ -117,8 +117,8 @@ class PreTrainedReward:
 
     def make_prediction(self, sess, all_start_joints, all_goal_joints, all_actions, all_goal_poses,
                         all_transition_labels=None, images=None):
-        feed = self.make_feed(all_start_joints, all_goal_joints, all_actions, all_goal_poses, all_transition_labels,
-                              images)
+        feed = self.make_feed(all_start_joints, all_goal_joints, all_actions, all_goal_poses, images=images,
+                              all_transition_labels=all_transition_labels)
         return sess.run([self.reward_prediction, self.status_softmax_logits], feed)
 
     def make_feed(self, all_start_joints, all_goal_joints, all_actions, all_goal_poses, images=None,

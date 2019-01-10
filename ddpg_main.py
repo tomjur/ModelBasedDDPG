@@ -337,7 +337,7 @@ def overload_config_by_scenario(config):
     if scenario != 'vision':
         params_file = os.path.join(params_file, 'params.pkl')
     config['general']['params_file'] = params_file
-    config['model']['consider_image'] = scenario is 'vision'
+    config['model']['consider_image'] = scenario == 'vision'
     config['model']['reward_model_name'] = scenario
 
 

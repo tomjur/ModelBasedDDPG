@@ -250,12 +250,12 @@ class Network(object):
         goal_pose_inputs = tf.placeholder(tf.float32, (None, self.pose_dimensions), name='goal_pose_inputs')
         return joints_inputs, workspace_image_inputs, goal_joints_inputs, goal_pose_inputs
 
-    def _generate_policy_features(self, current_joints):
+    def _generate_policy_features(self, current_joints, prefix, reuse_flag):
         features = [current_joints, self.goal_joints_inputs]
         # features.append(self.goal_joints_inputs - current_joints)
         if self.images_3d is not None:
-            perception = DqnModel()
-            features.append(perception.predict(self.images_3d))
+            perception = DqnModel(prefix)
+            features.append(perception.predict(self.images_3d, reuse_flag))
         if self.goal_pose_inputs is not None:
             features.append(self.goal_pose_inputs)
         return tf.concat(features, axis=1)
@@ -280,7 +280,7 @@ class Network(object):
         name_prefix = '{}_actor_{}'.format(os.getpid(), 'online' if is_online else 'target')
         activation = get_activation(self.config['action_predictor']['activation'])
         layers = self.config['action_predictor']['layers'] + [self.number_of_joints]
-        current = self._generate_policy_features(joints_input)
+        current = self._generate_policy_features(joints_input, name_prefix, reuse_flag)
         for i, layer_size in enumerate(layers[:-1]):
             current = tf.layers.dense(
                 current, layer_size, activation=activation, name='{}_{}'.format(name_prefix, i), reuse=reuse_flag
@@ -298,7 +298,7 @@ class Network(object):
         layers_after_action = self.config['critic']['layers_after_action']
         activation = get_activation(self.config['critic']['activation'])
 
-        current = self._generate_policy_features(joints_input)
+        current = self._generate_policy_features(joints_input, name_prefix, reuse_flag)
         scale = self.config['critic']['l2_regularization_coefficient'] if add_regularization_loss else 0.0
         for i, layer_size in enumerate(layers_before_action):
             current = tf.layers.dense(

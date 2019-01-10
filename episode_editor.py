@@ -67,7 +67,7 @@ class EpisodeEditor:
         # predict for all the episodes in the same time
         fake_rewards, fake_status_prob = self.pre_trained_reward.make_prediction(
             sess, self.current_joints_buffer, self.goal_joints_buffer, self.actions_buffer, self.goal_poses_buffer,
-            self.status_buffer
+            self.status_buffer, images=self.images_buffer
         )
         # partition the results by episode
         resulting_episodes = []

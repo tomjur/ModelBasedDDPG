@@ -142,9 +142,12 @@ class ActorProcess(multiprocessing.Process):
         if self.use_vision:
             # if we are doing multiple workspaces needs to load the correct one from the cache
             workspace_id = query_params[2]
-            self.openrave_interface.openrave_manager.set_params(self.image_cache[workspace_id].full_filename)
+            cache_item = self.image_cache.items[workspace_id]
+            workspace_image = cache_item.np_array
+            self.openrave_interface.openrave_manager.set_params(cache_item.full_filename)
         else:
             workspace_id = None
+            workspace_image = None
 
         # the trajectory data structures to return
         start_episode_time = datetime.datetime.now()
@@ -167,7 +170,7 @@ class ActorProcess(multiprocessing.Process):
         for j in range(max_steps):
             # do a single step prediction
             action_mean = self.actor.predict_action(
-                [current_state[0]], [None], [goal_pose], [goal_joints], sess, use_online_network=is_train
+                [current_state[0]], [workspace_image], [goal_pose], [goal_joints], sess, use_online_network=is_train
             )[0]
             sampled_action = self._get_sampled_action(action_mean) if is_train else action_mean
             # make an environment step
