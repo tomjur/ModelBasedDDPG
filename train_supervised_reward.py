@@ -220,8 +220,12 @@ with tf.Session(
     current_global_step = 0
     for epoch in range(epochs):
         # run train for one epoch
-        for raw_train_batch in train_batcher:
-            train_batch = oversample_batch(raw_train_batch, oversample_large_magnitude=True)
+        random.shuffle(train)
+        data_index = 0
+        while data_index < len(train):
+            oversample = (config['reward']['oversample_goal'], config['reward']['oversample_collision'])
+            train_batch = oversample_batch(train, data_index, batch_size, oversample_large_magnitude=oversample)
+            data_index += batch_size
             if train_batch is None:
                 continue
             train_batch, train_rewards, train_status = get_batch_and_labels(train_batch, openrave_manager, image_cache)
@@ -242,11 +246,9 @@ with tf.Session(
 
         if current_global_step > 0:
             # run test for one (random) batch
-            test_batch = None
-            for raw_test_batch in test_batcher:
-                test_batch = oversample_batch(raw_test_batch, oversample_large_magnitude=False)
-                break
-            test_batch, test_rewards, test_status = get_batch_and_labels(test_batch, openrave_manager, image_cache)
+            random.shuffle(test)
+            test_batch = oversample_batch(test, 0, test_batch_size, oversample_large_magnitude=None)
+            test_batch, test_rewards, test_status = get_batch_and_labels(test_batch, openrave_manager)
             test_feed = pre_trained_reward.make_feed(*test_batch)
             test_feed[reward_input] = np.expand_dims(np.array(test_rewards), axis=1)
             test_feed[status_input] = np.array(test_status)

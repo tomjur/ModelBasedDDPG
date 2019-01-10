@@ -139,9 +139,12 @@ class PreTrainedReward:
         return feed
 
 
-def oversample_batch(current_batch, oversample_large_magnitude=False):
-    if not oversample_large_magnitude:
+def oversample_batch(data_collection, data_index, batch_size, oversample_large_magnitude=None):
+    current_batch = data_collection[data_index:data_index + batch_size]
+    if oversample_large_magnitude is None:
         return current_batch
+    oversample_success = oversample_large_magnitude[0]
+    oversample_collision = oversample_large_magnitude[1]
     status = [b[-1] for b in current_batch]
     success_reward_indices = [i for i, s in enumerate(status) if s == 3]
     if len(success_reward_indices) < 3:
@@ -155,9 +158,11 @@ def oversample_batch(current_batch, oversample_large_magnitude=False):
     batch_indices = other_reward_indices
     # sample_size = min(100, len(other_reward_indices))
     # batch_indices = list(np.random.choice(other_reward_indices, sample_size))
-    success_super_sample = list(np.random.choice(success_reward_indices, sample_size))
+    success_sample_size = int(oversample_success * sample_size)
+    success_super_sample = list(np.random.choice(success_reward_indices, success_sample_size))
     batch_indices.extend(success_super_sample)
-    collision_super_sample = list(np.random.choice(collision_reward_indices, sample_size))
+    collision_sample_size = int(oversample_collision * sample_size)
+    collision_super_sample = list(np.random.choice(collision_reward_indices, collision_sample_size))
     batch_indices.extend(collision_super_sample)
     return [current_batch[i] for i in batch_indices]
 

@@ -36,5 +36,5 @@ reward:
   l2_regularization_coefficient: 0.0001
   cross_entropy_coefficient: 1.0
   activation: 'elu'
-
-
+  oversample_goal: 1.0
+  oversample_collision: 1.0
