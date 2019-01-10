@@ -48,20 +48,21 @@ class EpisodeEditor:
                 self.status_buffer, images=self.images_buffer
             )
         current_index = 0
-        fake_rewards, fake_status_prob = [], []
-        while current_index <= len(self.current_joints_buffer):
+        fake_rewards = np.zeros((0, 1), dtype=np.float32)
+        fake_status_prob = np.zeros((0, self.status_dimension), dtype=np.float32)
+        while current_index < len(self.current_joints_buffer):
             current_prediction_result = self.pre_trained_reward.make_prediction(
                 sess,
-                self.current_joints_buffer[current_index: self.allowed_batch],
-                self.goal_joints_buffer[current_index: self.allowed_batch],
-                self.actions_buffer[current_index: self.allowed_batch],
-                self.goal_poses_buffer[current_index: self.allowed_batch],
-                self.status_buffer[current_index: self.allowed_batch],
-                images=self.images_buffer[current_index: self.allowed_batch]
+                self.current_joints_buffer[current_index: current_index + self.allowed_batch],
+                self.goal_joints_buffer[current_index: current_index + self.allowed_batch],
+                self.actions_buffer[current_index: current_index + self.allowed_batch],
+                self.goal_poses_buffer[current_index: current_index + self.allowed_batch],
+                self.status_buffer[current_index: current_index + self.allowed_batch],
+                images=self.images_buffer[current_index: current_index + self.allowed_batch]
             )
             current_index += self.allowed_batch
-            fake_rewards.extend(current_prediction_result[0])
-            fake_status_prob.extend(current_prediction_result[1])
+            fake_rewards = np.append(fake_rewards, current_prediction_result[0], axis=0)
+            fake_status_prob = np.append(fake_status_prob, current_prediction_result[1], axis=0)
         return fake_rewards, fake_status_prob
 
     def process_episodes(self, episodes, sess):
