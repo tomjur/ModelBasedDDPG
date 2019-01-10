@@ -1,6 +1,7 @@
 import os
 import random
 import datetime
+import bz2
 import tensorflow as tf
 import yaml
 import time
@@ -174,7 +175,8 @@ def run_for_config(config, print_messages):
             sess, global_step, test_episodes, test_successful_episodes, test_collision_episodes,
             test_max_len_episodes
         )
-        test_results.append((global_step, episodes, test_successful_episodes))
+        test_results.append((global_step, episodes, test_successful_episodes, test_collision_episodes,
+                             test_max_len_episodes, test_mean_reward))
         # see if best
         rate = test_successful_episodes / float(test_episodes)
         if best_model_test_success_rate < rate:
@@ -302,6 +304,10 @@ def run_for_config(config, print_messages):
     with open(os.path.join(completed_trajectories_dir, 'final_status.txt'), 'w') as f:
         f.write(last_message)
         f.flush()
+
+    test_results_file = os.path.join(completed_trajectories_dir, 'test_results.test_results_pkl')
+    with bz2.BZ2File(test_results_file, 'w') as compressed_file:
+        pickle.dump(test_results, compressed_file)
 
     rollout_manager.end()
     return test_results
