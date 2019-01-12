@@ -13,18 +13,40 @@ from openravepy import *
 from potential_point import PotentialPoint
 from workspace_generation_utils import WorkspaceParams
 
-trajectories_dir = os.path.abspath(os.path.expanduser('/home/tom/ModelBasedDDPG/trajectories'))
-model_name = '2018_12_31_11_38_52'  # step 134040 path 71 (91, 99, 145)
-global_step = '134040'
-path_id = '32'
+# scenario = 'simple'
+scenario = 'hard'
+# scenario = 'vision'
+
+# trajectories_dir = os.path.abspath(os.path.expanduser('/home/tom/ModelBasedDDPG/trajectories'))
+trajectories_dir = os.path.abspath(os.path.expanduser(os.path.join('/home/tom/ModelBasedDDPG', scenario, 'trajectories')))
+
+# model_name = '2018_12_31_11_38_52'  # step 134040 path 71 (91, 99, 145)
+# global_step = '134040'
+# path_id = '32'
+# model_name = '2019_01_03_12_20_56' # step 72040: 30, 51, 131
+# global_step = '72040'
+# path_id = '29'
+# message = 'max_len'
+# model_name = '2019_01_06_17_08_26' # step 60040 138?
+# global_step = '60040'
+# path_id = '175'
+# model_name = '2019_01_06_17_08_26' # step 130?
+# global_step = '388040'
+# path_id = '16'
+# model_name = '2019_01_09_12_07_16' # step 260040: 53? 77? 81? 82?
+# global_step = '260040'
+# path_id = '14'
+model_name = '2019_01_10_21_15_36' # 90? 159! 162!
+global_step = '60040'
+path_id = '17'
+
+
 message = 'max_len'
 # message = 'collision'
 # message = 'success'
 # workspace_params_path = None
 
-# scenario = 'simple'
-scenario = 'hard'
-# scenario = 'vision'
+
 workspace_params_path = os.path.abspath(os.path.expanduser(
     os.path.join('/home/tom/ModelBasedDDPG/scenario_params', scenario, 'params.pkl')))
 speed = 30.0
