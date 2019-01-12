@@ -218,7 +218,7 @@ class Network(object):
     @staticmethod
     def _compute_termination_from_status(status_logits):
         free_space_logits, collision_logits, goal_logits = tf.split(status_logits, 3, axis=1)
-        should_stop_logits = tf.maximum(collision_logits, goal_logits)
+        should_stop_logits = collision_logits + goal_logits
         softmax_logits = tf.concat((free_space_logits, should_stop_logits), axis=1)
         softmax_output = tf.nn.softmax(softmax_logits, axis=1)
         termination_probability = tf.split(softmax_output, 2, axis=1)[1]
