@@ -94,10 +94,10 @@ image_cache = None
 if scenario == 'vision':
     params_dir = os.path.abspath(os.path.expanduser('~/ModelBasedDDPG/scenario_params/vision/'))
     image_cache = ImageCache(params_dir)
-train = RewardDataLoader(os.path.join(base_data_dir, 'train'), max_read=80000)
-test = RewardDataLoader(os.path.join(base_data_dir, 'test'), max_read=80000)
-# train = RewardDataLoader(os.path.join(base_data_dir, 'train'))
-# test = RewardDataLoader(os.path.join(base_data_dir, 'test'))
+# train = RewardDataLoader(os.path.join(base_data_dir, 'train'), max_read=80000)
+# test = RewardDataLoader(os.path.join(base_data_dir, 'test'), max_read=80000)
+train = RewardDataLoader(os.path.join(base_data_dir, 'train'))
+test = RewardDataLoader(os.path.join(base_data_dir, 'test'))
 
 
 def describe_data(data_collection):
@@ -207,7 +207,7 @@ test_summaries = tf.summary.merge([
     tf.summary.scalar('other_accuracy', other_accuracy_input),
 ])
 
-shuffle_batch_multiplier = 100
+shuffle_batch_multiplier = 2
 train_batcher = Batcher(Batcher(train, batch_size * shuffle_batch_multiplier, True), batch_size, False)
 test_batcher = Batcher(Batcher(test, test_batch_size * shuffle_batch_multiplier, True), test_batch_size, False)
 
