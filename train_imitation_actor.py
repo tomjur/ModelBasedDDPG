@@ -40,6 +40,10 @@ def load_data_from(data_dir, max_read=None):
         current_buffer = pickle.load(open(os.path.join(data_dir, file)))
         paths.extend(current_buffer)
 
+    # take only the required size
+    if max_read is not None:
+        paths = paths[:max_read]
+
     # assert length
     step_size = config['openrave_rl']['action_step_size'] + 0.00001
     for (traj, image, goal_pose) in paths:
