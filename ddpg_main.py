@@ -39,6 +39,7 @@ def run_for_config(config, print_messages):
     saver_dir = os.path.join(working_dir, 'models', model_name)
     if not os.path.exists(saver_dir):
         os.makedirs(saver_dir)
+    best_model_path = None
     config_copy_path = os.path.join(working_dir, 'models', model_name, 'config.yml')
     summaries_dir = os.path.join(working_dir, 'tensorboard', model_name)
     completed_trajectories_dir = os.path.join(working_dir, 'trajectories', model_name)
@@ -177,7 +178,7 @@ def run_for_config(config, print_messages):
 
     def do_test(sess, best_model_global_step, best_model_test_success_rate):
         rollout_manager.set_policy_weights(network.get_actor_weights(sess, is_online=False), is_online=False)
-        eval_result = trajectory_eval.eval(global_step)
+        eval_result = trajectory_eval.eval(global_step, config['test']['number_of_episodes'])
         test_episodes = eval_result[0]
         test_successful_episodes = eval_result[1]
         test_collision_episodes = eval_result[2]
@@ -207,6 +208,32 @@ def run_for_config(config, print_messages):
             if print_messages:
                 print 'best model still at step {}'.format(best_model_global_step)
         return is_best, best_model_global_step, best_model_test_success_rate
+
+    def do_end_of_run_validation(sess):
+        # restores the model first
+        saver.restore(sess, best_model_path)
+        # set the weights
+        rollout_manager.set_policy_weights(network.get_actor_weights(sess, is_online=False), is_online=False)
+        eval_result = trajectory_eval.eval(-1, config['validation']['number_of_episodes'])
+        test_episodes = eval_result[0]
+        test_successful_episodes = eval_result[1]
+        test_collision_episodes = eval_result[2]
+        test_max_len_episodes = eval_result[3]
+        test_mean_reward = eval_result[4]
+        if print_messages:
+            print_state('validation (best model)', test_episodes, test_successful_episodes, test_collision_episodes,
+                        test_max_len_episodes)
+            print('validation (best model) mean total reward {}'.format(test_mean_reward))
+        summaries_collector.write_test_episode_summaries(
+            sess, global_step, test_episodes, test_successful_episodes, test_collision_episodes,
+            test_max_len_episodes
+        )
+        test_results.append((-1, episodes, test_successful_episodes, test_collision_episodes,
+                             test_max_len_episodes, test_mean_reward))
+        # see if best
+        rate = test_successful_episodes / float(test_episodes)
+        print 'final success rate is {}'.format(rate)
+        return rate
 
     allowed_batch_episode_editor = config['model']['batch_size'] if scenario == 'vision' else None
     regular_episode_editor = EpisodeEditor(
@@ -308,7 +335,7 @@ def run_for_config(config, print_messages):
                 is_best, best_model_global_step, best_model_test_success_rate = do_test(
                     sess, best_model_global_step, best_model_test_success_rate)
                 if is_best:
-                    saver.save(sess, os.path.join(saver_dir, 'best'), global_step=global_step)
+                    best_model_path = saver.save(sess, os.path.join(saver_dir, 'best'), global_step=global_step)
             if update_index % config['general']['save_model_every_cycles'] == 0:
                 saver.save(sess, os.path.join(saver_dir, 'last_iteration'), global_step=global_step)
 
@@ -316,9 +343,13 @@ def run_for_config(config, print_messages):
         is_best, best_model_global_step, best_model_test_success_rate = do_test(
             sess, best_model_global_step, best_model_test_success_rate)
         if is_best:
-            saver.save(sess, os.path.join(saver_dir, 'best'), global_step=global_step)
-    last_message = 'best model stats at step {} has success rate of {}'.format(
-        best_model_global_step, best_model_test_success_rate)
+            best_model_path = saver.save(sess, os.path.join(saver_dir, 'best'), global_step=global_step)
+
+        # get a validation rate for the best recorded model
+        validation_rate = do_end_of_run_validation(sess)
+
+    last_message = 'best model stats at step {} has success rate of {} and validation success rate of {}'.format(
+        best_model_global_step, best_model_test_success_rate, validation_rate)
     print last_message
 
     with open(os.path.join(completed_trajectories_dir, 'final_status.txt'), 'w') as f:

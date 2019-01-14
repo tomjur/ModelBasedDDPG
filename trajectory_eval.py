@@ -13,13 +13,12 @@ class TrajectoryEval:
         potential_points_path = os.path.join(self.results_directory, 'potential_points.p')
         pickle.dump(PotentialPoint.from_config(config), open(potential_points_path, 'w'))
 
-    def eval(self, global_step, allowed_distance=None):
+    def eval(self, global_step, number_of_episodes):
         successful_episodes = 0
         collision_episodes = 0
         max_len_episodes = 0
         episodes = 0
         mean_total_reward = 0.0
-        number_of_episodes = self.config['test']['number_of_episodes']
         episode_results = self.rollout_manager.generate_episodes(number_of_episodes, False)
         for episode_result in episode_results:
             episode_agent_trajectory = episode_result[0]
