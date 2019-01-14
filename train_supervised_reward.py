@@ -94,8 +94,8 @@ image_cache = None
 if scenario == 'vision':
     params_dir = os.path.abspath(os.path.expanduser('~/ModelBasedDDPG/scenario_params/vision/'))
     image_cache = ImageCache(params_dir)
-# train = RewardDataLoader(os.path.join(base_data_dir, 'train'), max_read=80000)
-# test = RewardDataLoader(os.path.join(base_data_dir, 'test'), max_read=80000)
+# train = RewardDataLoader(os.path.join(base_data_dir, 'train'), max_read=100000)
+# test = RewardDataLoader(os.path.join(base_data_dir, 'test'), max_read=100000)
 train = RewardDataLoader(os.path.join(base_data_dir, 'train'))
 test = RewardDataLoader(os.path.join(base_data_dir, 'test'))
 
@@ -220,12 +220,9 @@ with tf.Session(
     current_global_step = 0
     for epoch in range(epochs):
         # run train for one epoch
-        random.shuffle(train)
-        data_index = 0
-        while data_index < len(train):
+        for train_batch_raw in train_batcher:
             oversample = (config['reward']['oversample_goal'], config['reward']['oversample_collision'])
-            train_batch = oversample_batch(train, data_index, batch_size, oversample_large_magnitude=oversample)
-            data_index += batch_size
+            train_batch = oversample_batch(train_batch_raw, oversample_large_magnitude=oversample)
             if train_batch is None:
                 continue
             train_batch, train_rewards, train_status = get_batch_and_labels(train_batch, openrave_manager, image_cache)
@@ -246,9 +243,11 @@ with tf.Session(
 
         if current_global_step > 0:
             # run test for one (random) batch
-            random.shuffle(test)
-            test_batch = oversample_batch(test, 0, test_batch_size, oversample_large_magnitude=None)
-            test_batch, test_rewards, test_status = get_batch_and_labels(test_batch, openrave_manager)
+            test_batch = None
+            for test_batch_raw in test_batcher:
+                test_batch = oversample_batch(test_batch_raw, oversample_large_magnitude=None)
+                break
+            test_batch, test_rewards, test_status = get_batch_and_labels(test_batch, openrave_manager, image_cache)
             test_feed = pre_trained_reward.make_feed(*test_batch)
             test_feed[reward_input] = np.expand_dims(np.array(test_rewards), axis=1)
             test_feed[status_input] = np.array(test_status)
