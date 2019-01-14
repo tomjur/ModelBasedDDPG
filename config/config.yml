@@ -8,19 +8,20 @@ general:
   model_updates_per_cycle: 40
 #  model_updates_per_cycle: 400
   max_path_slack: 1.5
-  gpu_usage: 0.01
-#  gpu_usage: 0.1 # vision
-  actor_gpu_usage: 0.01
-#  actor_gpu_usage: 0.1 # vision
+#  gpu_usage: 0.01
+  gpu_usage: 0.1 # vision
+#  actor_gpu_usage: 0.01
+  actor_gpu_usage: 0.1 # vision
 #  actor_processes: 6
-  actor_processes:
+  actor_processes: 4 # vision
+#  actor_processes:
 #  actor_processes: 1
   write_train_summaries: 500
   save_model_every_cycles: 100
 #  scenario: 'no_obstacles'
 #  scenario: 'simple'
-  scenario: 'hard'
-#  scenario: 'vision'
+#  scenario: 'hard'
+  scenario: 'vision'
 
 openrave_rl:
   action_step_size: 0.025
@@ -34,8 +35,8 @@ openrave_rl:
 
 model:
   buffer_size: 1000000
-  batch_size: 512
-#  batch_size: 10 # vision
+#  batch_size: 512
+  batch_size: 512 # vision
   gamma: 0.99
   potential_points: [5, -0.02, 0.035]
 #  potential_points: [2, 0., 0.075, 3, 0., 0.085, 4, -0.02, 0.05, 4, 0.005, 0.05, 5, 0.005, 0.035, 5, -0.02, 0.035]
