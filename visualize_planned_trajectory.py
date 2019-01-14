@@ -36,20 +36,23 @@ trajectories_dir = os.path.abspath(os.path.expanduser(os.path.join('/home/tom/Mo
 # model_name = '2019_01_09_12_07_16' # step 260040: 53? 77? 81? 82?
 # global_step = '260040'
 # path_id = '14'
-model_name = '2019_01_10_21_15_36' # 90? 159! 162!
-global_step = '60040'
-path_id = '17'
+# model_name = '2019_01_10_21_15_36' # 90? 159! 162!
+# global_step = '60040'
+# path_id = '17'
+# model_name = '2019_01_12_11_17_29'  # 14 60!!! 90!!!! 106!! 117 138 177!!!
+# global_step = '218040'
+# path_id = '177'
+model_name = '2019_01_13_17_43_18' # 15! 29
+global_step = '244040'
+path_id = '15'
 
 
-message = 'max_len'
-# message = 'collision'
+
+# message = 'max_len'
+message = 'collision'
 # message = 'success'
-# workspace_params_path = None
 
-
-workspace_params_path = os.path.abspath(os.path.expanduser(
-    os.path.join('/home/tom/ModelBasedDDPG/scenario_params', scenario, 'params.pkl')))
-speed = 30.0
+speed = 35.0
 
 display_start_goal_end_spheres = True
 trajectory_spheres_radius = 0.01
@@ -85,17 +88,25 @@ def main():
     potential_points_location = os.path.join(model_dir, 'potential_points.p')
     potential_points = pickle.load(open(potential_points_location))
 
-    openrave_manager = OpenraveManager(0.001, potential_points)
-    if workspace_params_path is not None:
-        openrave_manager.set_params(workspace_params_path)
-    openrave_manager.get_initialized_viewer()
-    # visualize the trajectory
     # search_key = os.path.join(model_dir, '{}_step_{}_{}.p'.format(global_step, message, path_id))
     search_key = os.path.join(model_dir, global_step, '{}_{}.p'.format(message, path_id))
     trajectory_files = glob.glob(search_key)
     trajectory_file = trajectory_files[0]
-    pose_goal, trajectory = pickle.load(open(trajectory_file))
+    pose_goal, trajectory, workspace_id = pickle.load(open(trajectory_file))
     trajectory = [[0.0] + list(j) for j in trajectory]
+
+    openrave_manager = OpenraveManager(0.001, potential_points)
+    # get the parameters
+    if scenario == 'vision':
+        workspace_params_path = os.path.abspath(os.path.expanduser(
+            os.path.join('~/ModelBasedDDPG/scenario_params/vision/', workspace_id)))
+    else:
+        workspace_params_path = os.path.abspath(os.path.expanduser(
+            os.path.join('~/ModelBasedDDPG/scenario_params', scenario, 'params.pkl')))
+    if workspace_params_path is not None:
+        openrave_manager.set_params(workspace_params_path)
+
+    openrave_manager.get_initialized_viewer()
 
     if display_start_goal_end_spheres:
         start = trajectory[0]
