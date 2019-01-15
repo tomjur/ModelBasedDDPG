@@ -90,7 +90,8 @@ def run_for_config(config, print_messages):
     hindsight_policy = HindsightPolicy(config, replay_buffer, score_for_hindsight)
 
     # save model
-    saver = tf.train.Saver(max_to_keep=4, save_relative_paths=saver_dir)
+    latest_saver = tf.train.Saver(max_to_keep=2, save_relative_paths=saver_dir)
+    best_saver = tf.train.Saver(max_to_keep=2, save_relative_paths=saver_dir)
     yaml.dump(config, open(config_copy_path, 'w'))
     summaries_collector = SummariesCollector(summaries_dir, model_name)
     rollout_manager = FixedRolloutManager(config, image_cache=image_cache)
@@ -211,7 +212,7 @@ def run_for_config(config, print_messages):
 
     def do_end_of_run_validation(sess):
         # restores the model first
-        saver.restore(sess, best_model_path)
+        best_saver.restore(sess, best_model_path)
         # set the weights
         rollout_manager.set_policy_weights(network.get_actor_weights(sess, is_online=False), is_online=False)
         eval_result = trajectory_eval.eval(-1, config['validation']['number_of_episodes'])
@@ -335,15 +336,15 @@ def run_for_config(config, print_messages):
                 is_best, best_model_global_step, best_model_test_success_rate = do_test(
                     sess, best_model_global_step, best_model_test_success_rate)
                 if is_best:
-                    best_model_path = saver.save(sess, os.path.join(saver_dir, 'best'), global_step=global_step)
+                    best_model_path = best_saver.save(sess, os.path.join(saver_dir, 'best'), global_step=global_step)
             if update_index % config['general']['save_model_every_cycles'] == 0:
-                saver.save(sess, os.path.join(saver_dir, 'last_iteration'), global_step=global_step)
+                latest_saver.save(sess, os.path.join(saver_dir, 'last_iteration'), global_step=global_step)
 
         # final test at the end
         is_best, best_model_global_step, best_model_test_success_rate = do_test(
             sess, best_model_global_step, best_model_test_success_rate)
         if is_best:
-            best_model_path = saver.save(sess, os.path.join(saver_dir, 'best'), global_step=global_step)
+            best_model_path = best_saver.save(sess, os.path.join(saver_dir, 'best'), global_step=global_step)
 
         # get a validation rate for the best recorded model
         validation_rate = do_end_of_run_validation(sess)
