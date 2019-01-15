@@ -14,13 +14,13 @@ class TrajectoryEval:
         pickle.dump(PotentialPoint.from_config(config), open(potential_points_path, 'w'))
         self._is_vision = config['model']['consider_image']
 
-    def eval(self, global_step, number_of_episodes):
+    def eval(self, global_step, number_of_episodes, is_train=False):
         successful_episodes = 0
         collision_episodes = 0
         max_len_episodes = 0
         episodes = 0
         mean_total_reward = 0.0
-        episode_results = self.rollout_manager.generate_episodes(number_of_episodes, False)
+        episode_results = self.rollout_manager.generate_episodes(number_of_episodes, is_train)
         for episode_result in episode_results:
             episode_agent_trajectory = episode_result[0]
             status = episode_agent_trajectory[0]

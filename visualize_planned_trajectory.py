@@ -17,8 +17,24 @@ from workspace_generation_utils import WorkspaceParams
 scenario = 'hard'
 # scenario = 'vision'
 
+is_imitation = True
+# is_imitation = False
+# is_train = True
+is_train = False
+
+
 # trajectories_dir = os.path.abspath(os.path.expanduser('/home/tom/ModelBasedDDPG/trajectories'))
-trajectories_dir = os.path.abspath(os.path.expanduser(os.path.join('/home/tom/ModelBasedDDPG', scenario, 'trajectories')))
+trajectories_dir = os.path.abspath(
+        os.path.expanduser('/home/tom/ModelBasedDDPG/'))
+if is_imitation:
+    trajectories_dir = os.path.join(trajectories_dir, 'imitation', scenario, 'trajectories')
+    if is_train:
+        trajectories_dir = os.path.join(trajectories_dir, 'train')
+    else:
+        trajectories_dir = os.path.join(trajectories_dir, 'test')
+else:
+    trajectories_dir = os.path.join(trajectories_dir, scenario, 'trajectories')
+
 
 # model_name = '2018_12_31_11_38_52'  # step 134040 path 71 (91, 99, 145)
 # global_step = '134040'
@@ -42,15 +58,22 @@ trajectories_dir = os.path.abspath(os.path.expanduser(os.path.join('/home/tom/Mo
 # model_name = '2019_01_12_11_17_29'  # 14 60!!! 90!!!! 106!! 117 138 177!!!
 # global_step = '218040'
 # path_id = '177'
-model_name = '2019_01_13_17_43_18' # 15! 29
-global_step = '244040'
-path_id = '15'
+# model_name = '2019_01_13_17_43_18' # 15! 29
+# global_step = '244040'
+# path_id = '15'
 
 
+# model_name = '2019_01_14_19_28_56' # 8 9 12 13 40 50 57 58 74 75 91!! 101 176!! 186! 187
+# global_step = '176040'
+# path_id = '186'
+
+model_name = '2019_01_15_18_24_29'
+global_step = '245'
+path_id = '3'
 
 # message = 'max_len'
-message = 'collision'
-# message = 'success'
+# message = 'collision'
+message = 'success'
 
 speed = 35.0
 

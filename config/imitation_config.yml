@@ -3,15 +3,17 @@ general:
   save_every_epochs: 5
   gpu_usage: 0.01
   actor_gpu_usage: 0.01
-  collector_processes: 4
-  actor_processes: 2
+  actor_processes: 8
   episodes_per_update: 16
   max_path_slack: 1.5
-  params_file: 'params_simple.pkl' # simple workspace
-#  params_file: 'params_hard.pkl' # hard workspace
+  scenario: 'simple'
+#  scenario: 'hard'
+  train_episodes_dataset: 1000
+#  train_episodes: 10000
+  test_episodes_dataset: 10000
 
 test:
-  number_of_episodes: 50
+  number_of_episodes: 200
 
 openrave_rl:
   action_step_size: 0.025
@@ -27,7 +29,7 @@ openrave_rl:
 
 model:
   batch_size: 1024
-  potential_points: [2, 0., 0.075, 3, 0., 0.085, 4, -0.02, 0.05, 4, 0.005, 0.05, 5, 0.005, 0.035, 5, -0.02, 0.035]
+  potential_points: [5, -0.02, 0.035]
   consider_image: False
   consider_goal_pose: True
 
