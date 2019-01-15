@@ -17,8 +17,8 @@ from workspace_generation_utils import WorkspaceParams
 scenario = 'hard'
 # scenario = 'vision'
 
-is_imitation = True
-# is_imitation = False
+# is_imitation = True
+is_imitation = False
 # is_train = True
 is_train = False
 
@@ -67,9 +67,9 @@ else:
 # global_step = '176040'
 # path_id = '186'
 
-model_name = '2019_01_15_18_24_29'
-global_step = '245'
-path_id = '3'
+model_name = '2019_01_15_20_26_24'
+global_step = '440'
+path_id = '0'
 
 # message = 'max_len'
 # message = 'collision'

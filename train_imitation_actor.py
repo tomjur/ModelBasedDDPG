@@ -171,7 +171,6 @@ if not os.path.exists(saver_dir):
 train_completed_trajectories_dir = os.path.join(base_dir, 'trajectories', 'train', model_name)
 test_completed_trajectories_dir = os.path.join(base_dir, 'trajectories', 'test', model_name)
 
-
 # save the config
 config_copy_path = os.path.join(saver_dir, 'config.yml')
 yaml.dump(config, open(config_copy_path, 'w'))
@@ -246,6 +245,16 @@ train_trajectory_eval = TrajectoryEval(config, rollout_manager, train_completed_
 
 # evaluate test paths
 test_trajectory_eval = TrajectoryEval(config, rollout_manager, test_completed_trajectories_dir)
+
+
+test_results = []
+best_epoch = -1
+best_success_rate = -1.0
+best_model_path = None
+
+latest_saver = tf.train.Saver(max_to_keep=2, save_relative_paths=saver_dir)
+best_saver = tf.train.Saver(max_to_keep=2, save_relative_paths=saver_dir)
+
 
 with tf.Session(
         config=tf.ConfigProto(
@@ -322,8 +331,37 @@ with tf.Session(
         }), current_global_step)
         
         test_summary_writer.flush()
-        # # save the model
-        # if epoch % save_every_epochs == save_every_epochs-1:
-        #     pre_trained_reward.saver.save(sess, os.path.join(saver_dir, 'reward'), global_step=current_global_step)
+        test_results.append((epoch, test_episodes, test_successful_episodes))
+        # save the model
+        if epoch % config['general']['save_every_epochs'] == 0:
+            latest_saver.save(sess, os.path.join(saver_dir, 'last_iteration'), global_step=epoch)
+
+        rate = test_successful_episodes / float(test_episodes)
+        if rate > best_success_rate:
+            best_model_path = best_saver.save(sess, os.path.join(saver_dir, 'best'), global_step=global_step)
+            print 'old best rate: {} new best rate: {}'.format(best_success_rate, rate)
+            best_success_rate = rate
+            best_epoch = epoch
+        else:
+            print 'current rate is: {}, best model is still at epoch {} with rate: {}'.format(
+                rate, best_epoch, best_success_rate)
         print 'done epoch {} of {}'.format(epoch, epochs)
+
+    # load best model, without training and save the test results
+    best_saver.restore(sess, best_model_path)
+    eval_result = test_trajectory_eval.eval(current_global_step, config['test']['number_of_episodes'],
+                                            is_train=False)
+    test_episodes = eval_result[0]
+    test_successful_episodes = eval_result[1]
+    test_collision_episodes = eval_result[2]
+    test_max_len_episodes = eval_result[3]
+    print_state('validation episodes', test_episodes, test_successful_episodes, test_collision_episodes,
+                test_max_len_episodes)
+
+    test_results.append((-1, test_episodes, test_successful_episodes))
+
     rollout_manager.end()
+
+test_results_file = os.path.join(test_completed_trajectories_dir, 'test_results.test_results_pkl')
+with bz2.BZ2File(test_results_file, 'w') as compressed_file:
+    pickle.dump(test_results, compressed_file)
