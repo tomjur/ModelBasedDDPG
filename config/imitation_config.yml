@@ -1,17 +1,17 @@
 general:
-  epochs: 1000
+  epochs: 100
   save_every_epochs: 5
   gpu_usage: 0.01
   actor_gpu_usage: 0.01
-#  actor_processes: 9
-  actor_processes:
+  actor_processes: 2
+#  actor_processes:
 #  actor_processes: 1
   episodes_per_update: 16
   max_path_slack: 1.5
   scenario: 'simple'
 #  scenario: 'hard'
-  train_files: 10
-  test_files: 10
+  train_files: 160
+  test_files: 40
 
 test:
   number_of_episodes: 200

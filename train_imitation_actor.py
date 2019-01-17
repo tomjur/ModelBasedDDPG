@@ -41,7 +41,6 @@ def produce_transitions(data_dir, cache_dir):
     print 'producing transition data from original trajectories at {}'.format(data_dir)
     assert os.path.exists(data_dir)
 
-
     if os.path.exists(cache_dir):
         print 'found cache dir at {}, assuming all transitions are present there (if not delete the directory)'.format(
             cache_dir)
@@ -77,8 +76,10 @@ def produce_transitions(data_dir, cache_dir):
 
         transition_file = os.path.join(cache_dir, file + '.transitions_cache')
         print 'writing transitions file {}'.format(transition_file)
-        with bz2.BZ2File(transition_file, 'w') as compressed_file:
-            pickle.dump(transitions, compressed_file)
+        with open(transition_file, 'w') as pickle_file:
+            pickle.dump(transitions, pickle_file)
+        # with bz2.BZ2File(transition_file, 'w') as compressed_file:
+        #     pickle.dump(transitions, compressed_file)
 
     print 'cache created at {}'.format(cache_dir)
 
@@ -299,8 +300,10 @@ class TransitionDataLoader:
     def __iter__(self):
         random.shuffle(self.files)
         for f in self.files:
-            with bz2.BZ2File(f, 'r') as compressed_file:
-                yield pickle.load(compressed_file)
+            with open(f, 'r') as pickle_file:
+                yield pickle.load(pickle_file)
+            # with bz2.BZ2File(f, 'r') as compressed_file:
+            #     yield pickle.load(compressed_file)
 
 
 class Batcher:
