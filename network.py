@@ -146,11 +146,9 @@ class Network(object):
         batch_size = tf.cast(tf.shape(self.joints_inputs)[0], tf.float32)
 
         # critic optimization
-        critic_prediction_loss = tf.div(
-            tf.losses.mean_squared_error(self.scalar_label, self.online_q_value_fixed_action), batch_size)
+        critic_prediction_loss = tf.losses.mean_squared_error(self.scalar_label, self.online_q_value_fixed_action)
         critic_regularization = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
-        critic_regularization_loss = tf.div(tf.add_n(critic_regularization), batch_size) \
-            if len(critic_regularization) > 0 else 0.0
+        critic_regularization_loss = tf.add_n(critic_regularization) if len(critic_regularization) > 0 else 0.0
         self.critic_total_loss = critic_prediction_loss + critic_regularization_loss
 
         self.critic_initial_gradients_norm, self.critic_clipped_gradients_norm, self.optimize_critic = \
