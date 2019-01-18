@@ -19,8 +19,8 @@ general:
   write_train_summaries: 500
   save_model_every_cycles: 100
 #  scenario: 'no_obstacles'
-#  scenario: 'simple'
-  scenario: 'hard'
+  scenario: 'simple'
+#  scenario: 'hard'
 #  scenario: 'vision'
 
 openrave_rl:
@@ -44,12 +44,14 @@ model:
 #  tau: 0.01
   random_action_probability: 0.02
   random_noise_std: 0.005
-  use_reward_model: True
-#  use_reward_model: False
-  alter_episode: 0  # natural reward and original episode
+#  use_reward_model: True
+  use_reward_model: False
+  alter_episode:
+#  alter_episode: 0  # natural reward and original episode
 #  alter_episode: 1  # use learned reward with episode truncation
 #  alter_episode: 2  # use learned reward without episode truncation
-  failed_motion_planner_trajectories: 8
+  failed_motion_planner_trajectories:
+#  failed_motion_planner_trajectories: 8
 #  failed_motion_planner_trajectories: 0
 
 test:
@@ -98,6 +100,6 @@ critic:
 #  last_layer_tanh: True
   last_layer_tanh: False
 
-reward:
-  activation: 'elu'
-  layers: [100, 100, 100, 100]
+#reward:
+#  activation: 'elu'
+#  layers: [100, 100, 100, 100]
