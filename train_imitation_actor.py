@@ -84,28 +84,66 @@ def produce_transitions(data_dir, cache_dir):
     print 'cache created at {}'.format(cache_dir)
 
 
-train_paths_dir = os.path.join('imitation_data', scenario, 'train')
+def produce_paths(data_dir, cache_dir):
+    print 'producing paths data from original trajectories at {}'.format(data_dir)
+    assert os.path.exists(data_dir)
+
+    if os.path.exists(cache_dir):
+        print 'found cache dir at {}, assuming all paths are present there (if not delete the directory)'.format(
+            cache_dir)
+        return
+
+    print 'cache not found, creating cache at: {}'.format(cache_dir)
+    if not os.path.exists(cache_dir):
+        os.makedirs(cache_dir)
+    files = [file for file in os.listdir(data_dir) if file.endswith(".path_pkl")]
+    assert len(files) > 0
+    for file in files:
+        print 'loading file {}'.format(file)
+        with bz2.BZ2File(os.path.join(data_dir, file), 'r') as compressed_file:
+            paths = pickle.load(compressed_file)
+
+        print 'asserting step sizes match'
+        step_size = config['openrave_rl']['action_step_size'] + 0.00001
+        for (traj, _) in paths:
+            for i in range(len(traj) - 1):
+                assert np.linalg.norm(np.array(traj[i]) - np.array(traj[i + 1])) < step_size
+
+        paths_file = os.path.join(cache_dir, file + '.paths_cache')
+        print 'writing paths file {}'.format(paths_file)
+        with open(paths_file, 'w') as pickle_file:
+            pickle.dump(paths, pickle_file)
+
+    print 'cache created at {}'.format(cache_dir)
+
+
+train_original_dir = os.path.join('imitation_data', scenario, 'train')
 train_transitions_dir = os.path.join('imitation_data_transitions', scenario, 'train')
 train_transitions_dir = os.path.join(train_transitions_dir, PotentialPoint.from_config(config)[-1].str)
-produce_transitions(train_paths_dir, train_transitions_dir)
-test_paths_dir = os.path.join('imitation_data', scenario, 'test')
+produce_transitions(train_original_dir, train_transitions_dir)
+train_paths_dir = os.path.join('imitation_data_paths', scenario, 'train')
+produce_paths(train_original_dir, train_paths_dir)
+
+test_original_dir = os.path.join('imitation_data', scenario, 'test')
 test_transitions_dir = os.path.join('imitation_data_transitions', scenario, 'test')
 test_transitions_dir = os.path.join(test_transitions_dir, PotentialPoint.from_config(config)[-1].str)
-produce_transitions(test_paths_dir, test_transitions_dir)
+produce_transitions(test_original_dir, test_transitions_dir)
+test_paths_dir = os.path.join('imitation_data_paths', scenario, 'test')
+produce_paths(test_original_dir, test_paths_dir)
 
 
 def get_files(paths_dir, transitions_dir, max_files=None):
     print 'loading from paths {} transitions {}. max files {}'.format(paths_dir, transitions_dir, max_files)
     assert os.path.exists(paths_dir)
     assert os.path.exists(transitions_dir)
-    files = [file for file in os.listdir(paths_dir) if file.endswith(".path_pkl")]
+    files = [file for file in os.listdir(paths_dir) if file.endswith(".paths_cache")]
     assert len(files) > 0
     for file in files:
-        assert os.path.exists(os.path.join(transitions_dir, file + '.transitions_cache'))
+        assert os.path.exists(os.path.join(transitions_dir, file).replace(".paths_cache", '.transitions_cache'))
     random.shuffle(files)
     files = files[:max_files]
     path_files = [os.path.join(paths_dir, f) for f in files]
-    transition_files = [os.path.join(transitions_dir, f + '.transitions_cache') for f in files]
+    transition_files = [os.path.join(transitions_dir, f.replace(".paths_cache", '.transitions_cache')) for f in files]
     return path_files, transition_files
 
 
@@ -221,8 +259,8 @@ class ImitationRolloutManager:
     def files_to_trajectories(files):
         paths = []
         for f in files:
-            with bz2.BZ2File(f, 'r') as compressed_file:
-                current_buffer = pickle.load(compressed_file)
+            with open(f, 'r') as pickle_file:
+                current_buffer = pickle.load(pickle_file)
                 paths.extend([t[0] for t in current_buffer])
         return paths
 
