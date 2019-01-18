@@ -51,7 +51,7 @@ def run_for_config(config, print_messages):
 
     # load pretrained model if required
     pre_trained_reward = None
-    if config['model']['use_reward_model'] is not None:
+    if config['model']['use_reward_model']:
         reward_model_name = config['model']['reward_model_name']
         pre_trained_reward = PreTrainedReward(reward_model_name, config)
 
