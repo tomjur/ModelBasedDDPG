@@ -460,14 +460,18 @@ with tf.Session(
 
     # load best model, without training and save the test results
     best_saver.restore(sess, best_model_path)
-    eval_result = test_trajectory_eval.eval(current_global_step, config['test']['number_of_episodes'],
-                                            is_train=False)
+    eval_result = test_trajectory_eval.eval(-1, config['test']['number_of_episodes'], is_train=False)
     test_episodes = eval_result[0]
     test_successful_episodes = eval_result[1]
     test_collision_episodes = eval_result[2]
     test_max_len_episodes = eval_result[3]
     print_state('validation episodes', test_episodes, test_successful_episodes, test_collision_episodes,
                 test_max_len_episodes)
+
+    with open(os.path.join(test_completed_trajectories_dir, 'final_status.txt'), 'w') as final_message_file:
+        validation_rate = test_successful_episodes / float(test_episodes)
+        final_message_file.write('final validation rate is {}'.format(validation_rate))
+        final_message_file.flush()
 
     test_results.append((-1, test_episodes, test_successful_episodes))
 
