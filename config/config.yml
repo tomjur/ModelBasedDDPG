@@ -3,7 +3,7 @@ general:
   random_seed: 123
 #  random_seed: 456
 #  random_seed: 789
-  updates_cycle_count: 10000
+  updates_cycle_count: 5000
   episodes_per_update: 16
   model_updates_per_cycle: 40
 #  model_updates_per_cycle: 400
