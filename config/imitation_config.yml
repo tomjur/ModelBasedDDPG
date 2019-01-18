@@ -3,7 +3,7 @@ general:
   save_every_epochs: 5
   gpu_usage: 0.01
   actor_gpu_usage: 0.01
-  actor_processes: 2
+  actor_processes: 8
 #  actor_processes:
 #  actor_processes: 1
   episodes_per_update: 16
@@ -41,8 +41,9 @@ action_predictor:
 imitation:
 #  initial_learn_rate: 0.001
   initial_learn_rate: 0.0001
-  decrease_learn_rate_after: 2000
+#  decrease_learn_rate_after: 2000
 #  decrease_learn_rate_after: 10000
+  decrease_learn_rate_after: 100000
   learn_rate_decrease_rate: 0.8
 #  learning_rate: 0.0001
   gradient_limit: 5.0
