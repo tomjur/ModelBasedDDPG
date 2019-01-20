@@ -46,7 +46,14 @@ class HindsightPolicy:
                 )
         else:
             for transition in self.augmented_buffer:
-                self.replay_buffer.add(*zip(transition))
+                goal_pose, goal_joints, workspace_id, current_state, action_used, current_reward, is_terminal, \
+                next_state = transition
+                self.replay_buffer.add(
+                    goal_pose, goal_joints, workspace_id, current_state, action_used, current_reward, is_terminal,
+                    next_state
+                )
+            # for transition in self.augmented_buffer:
+            #     self.replay_buffer.add(*zip(transition))
 
     def _add_extra_data(self, current_state_index, status, states, actions, rewards, workspace_id):
         if not self.config['hindsight']['enable']:
