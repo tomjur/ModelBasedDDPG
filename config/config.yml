@@ -5,6 +5,7 @@ general:
 #  random_seed: 789
   updates_cycle_count: 4000 # simple
 #  updates_cycle_count: 5000 # hard
+#  updates_cycle_count: 10000 # vision
   episodes_per_update: 16
   model_updates_per_cycle: 40
   max_path_slack: 1.5
@@ -13,7 +14,7 @@ general:
   actor_gpu_usage: 0.01
 #  actor_gpu_usage: 0.1 # vision
 #  actor_processes: 8
-#  actor_processes: 4 # vision
+#  actor_processes: 6 # vision
   actor_processes:
 #  actor_processes: 1
   write_train_summaries: 500
@@ -76,8 +77,6 @@ actor:
 
 action_predictor:
   layers: [200, 200, 200, 200]
-#  layers: [300, 300, 200, 200, 100]
-#  layers: [64, 64, 64]
   activation: 'elu'
   tanh_preactivation_loss_coefficient: 1.0
 #  tanh_preactivation_loss_coefficient: 0.0
@@ -89,10 +88,6 @@ critic:
 #  gradient_limit: 0.0
   layers_before_action: [400, 400, 400]
   layers_after_action: [400, 400, 400, 400]
-#  layers_before_action: [400, 400]
-#  layers_after_action: [400, 400, 400]
-#  layers_before_action: [64]
-#  layers_after_action: [64, 64]
   activation: 'elu'
 #  l2_regularization_coefficient: 0.0
   l2_regularization_coefficient: 0.0000001
