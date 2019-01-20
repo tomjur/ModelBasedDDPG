@@ -46,8 +46,7 @@ model:
   random_noise_std: 0.005
 #  use_reward_model: True
   use_reward_model: False
-  alter_episode:
-#  alter_episode: 0  # natural reward and original episode
+  alter_episode: 0  # natural reward and original episode
 #  alter_episode: 1  # use learned reward with episode truncation
 #  alter_episode: 2  # use learned reward without episode truncation
   failed_motion_planner_trajectories:
