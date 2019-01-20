@@ -225,10 +225,6 @@ def run_for_config(config, print_messages):
             print_state('validation (best model)', test_episodes, test_successful_episodes, test_collision_episodes,
                         test_max_len_episodes)
             print('validation (best model) mean total reward {}'.format(test_mean_reward))
-        summaries_collector.write_test_episode_summaries(
-            sess, global_step, test_episodes, test_successful_episodes, test_collision_episodes,
-            test_max_len_episodes
-        )
         test_results.append((-1, episodes, test_successful_episodes, test_collision_episodes,
                              test_max_len_episodes, test_mean_reward))
         # see if best
