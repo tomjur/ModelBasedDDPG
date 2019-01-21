@@ -52,8 +52,11 @@ model:
   alter_episode: 0  # natural reward and original episode
 #  alter_episode: 1  # use learned reward with episode truncation
 #  alter_episode: 2  # use learned reward without episode truncation
-  failed_motion_planner_trajectories:
-#  failed_motion_planner_trajectories: 8
+  alter_episode_expert: 0  # natural reward and original episode
+#  alter_episode_expert: 1  # use learned reward with episode truncation
+#  alter_episode_expert: 2  # use learned reward without episode truncation
+#  failed_motion_planner_trajectories:
+  failed_motion_planner_trajectories: 8
 #  failed_motion_planner_trajectories: 0
 
 test:

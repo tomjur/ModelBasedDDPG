@@ -174,7 +174,8 @@ def run_for_config(config, print_messages):
         actions = [np.array(example_trajectory[i+1]) - np.array(example_trajectory[i])
                    for i in range(len(example_trajectory)-1)]
         actions = [a / max(np.linalg.norm(a), 0.00001) for a in actions]
-        rewards = [None] * len(actions)
+
+        rewards = [-config['openrave_rl']['keep_alive_penalty']] * (len(actions)-1) + [1.0]
         return status, states, actions, rewards, goal_pose, goal_joints, workspace_id
 
     def do_test(sess, best_model_global_step, best_model_test_success_rate):
@@ -238,7 +239,8 @@ def run_for_config(config, print_messages):
         allowed_batch=allowed_batch_episode_editor
     )
     motion_planner_episode_editor = EpisodeEditor(
-        2, pre_trained_reward, image_cache=image_cache, allowed_batch=allowed_batch_episode_editor)
+        config['model']['alter_episode_expert'], pre_trained_reward, image_cache=image_cache,
+        allowed_batch=allowed_batch_episode_editor)
 
     with tf.Session(
             config=tf.ConfigProto(
