@@ -4,24 +4,25 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 groups_to_test_results_files = {
-    'test1': [
-        '/home/tom/results/simple_noise_levels/trajectories/high/test_results.test_results_pkl',
-        '/home/tom/results/simple_noise_levels/trajectories/mid/test_results.test_results_pkl',
-        '/home/tom/results/simple_noise_levels/trajectories/min/test_results.test_results_pkl'
+    'DDPG': [
+        '/home/tom/paper_results/simple_scenario/trajectories/ddpg1/test_results.test_results_pkl',
+        '/home/tom/paper_results/simple_scenario/trajectories/ddpg2/test_results.test_results_pkl',
+        '/home/tom/paper_results/simple_scenario/trajectories/ddpg3/test_results.test_results_pkl',
     ]
 }
-title = 'my title'
+title = 'simple scenario'
 colors = ['blue', 'green', 'red', 'yellow', 'teal']
 
 
 def load_file_as_series(test_results_file):
     with bz2.BZ2File(test_results_file, 'r') as compressed_file:
         test_results = pickle.load(compressed_file)
-    print len(test_results)
     episodes_res = []
     success_rate_res = []
     for t in test_results:
         global_step, episodes, test_successful_episodes, test_collision_episodes,test_max_len_episodes, test_mean_reward = t
+        if global_step == -1:
+            continue
         episodes_res.append(episodes)
         success_rate_res.append(float(test_successful_episodes) / (test_successful_episodes + test_collision_episodes + test_max_len_episodes))
     return episodes_res, success_rate_res
@@ -56,8 +57,8 @@ fig, ax = plt.subplots(1)
 for i, label in enumerate(groups_to_test_results_files.keys()):
     group_axis, group_data = load_several_files(groups_to_test_results_files[label])
     plot_group(group_axis, group_data, ax, label, colors[i])
-ax.set_title(r'title')
-ax.legend(loc='upper left')
+ax.set_title(title)
+ax.legend(loc='lower right')
 ax.set_xlabel('train episodes')
 ax.set_ylabel('success rate')
 plt.show()
