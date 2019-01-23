@@ -15,13 +15,30 @@ import tensorflow as tf
 class RewardDataLoader:
     def __init__(self, data_dir, status_to_read, max_read=None):
         assert os.path.exists(data_dir)
+        cache_dir = data_dir.replace('supervised_data', 'supervised_data_cache')
+        if not os.path.exists(cache_dir):
+            self._create_cache(data_dir, cache_dir)
         files = [f for f in os.listdir(data_dir) if f.endswith(".pkl") and f.startswith('{}_'.format(status_to_read))]
         assert len(files) > 0
-        self.data_dir = data_dir
+        self.cache_dir = cache_dir
         self.files = files
         self.max_read = max_read
 
         self.first_iteration_done = False
+
+    @staticmethod
+    def _create_cache(data_dir, cache_dir):
+        print 'creating cache for {} in {}'.format(data_dir, cache_dir)
+        os.makedirs(cache_dir)
+        files = [f for f in os.listdir(data_dir) if f.endswith(".pkl")]
+        for f in files:
+            destination_file = os.path.join(cache_dir, f)
+            print 'caching {}'.format(f)
+            with bz2.BZ2File(os.path.join(data_dir, f), 'r') as compressed_file:
+                data = pickle.load(compressed_file)
+                with open(destination_file, 'w') as cache_file:
+                    pickle.dump(data, cache_file)
+        print 'done creating cache for {} in {}'.format(data_dir, cache_dir)
 
     def __iter__(self):
         random.shuffle(self.files)
@@ -29,8 +46,10 @@ class RewardDataLoader:
         row_counter = 0
         result = []
         for f in self.files:
-            with bz2.BZ2File(os.path.join(self.data_dir, f), 'r') as compressed_file:
-                result = pickle.load(compressed_file)
+            # with bz2.BZ2File(os.path.join(self.cache_dir, f), 'r') as compressed_file:
+            #     result = pickle.load(compressed_file)
+            with open(os.path.join(self.cache_dir, f), 'r') as source_file:
+                result = pickle.load(source_file)
             row_counter += len(result)
             if not self.first_iteration_done and self.max_read is not None:
                 files_to_keep.append(f)
@@ -147,10 +166,10 @@ if scenario == 'vision':
 train_data_dir = os.path.join(base_data_dir, 'train')
 test_data_dir = os.path.join(base_data_dir, 'test')
 
-train = Oversampler(train_data_dir, batch_size, oversample_goal, oversample_collision, max_read=10000)
-test = Oversampler(train_data_dir, batch_size, oversample_goal, oversample_collision, max_read=10000)
-# train = Oversampler(train_data_dir, batch_size, oversample_goal, oversample_collision)
-# test = Oversampler(train_data_dir, batch_size, oversample_goal, oversample_collision)
+# train = Oversampler(train_data_dir, batch_size, oversample_goal, oversample_collision, max_read=10000)
+# test = Oversampler(test_data_dir, batch_size, oversample_goal, oversample_collision, max_read=10000)
+train = Oversampler(train_data_dir, batch_size, oversample_goal, oversample_collision)
+test = Oversampler(train_data_dir, batch_size, oversample_goal, oversample_collision)
 
 # get openrave manager
 openrave_manager = OpenraveManager(0.001, PotentialPoint.from_config(config))
@@ -240,7 +259,6 @@ test_summaries = tf.summary.merge([
     tf.summary.scalar('collision_accuracy', collision_accuracy_input),
     tf.summary.scalar('other_accuracy', other_accuracy_input),
 ])
-
 
 with tf.Session(
         config=tf.ConfigProto(
