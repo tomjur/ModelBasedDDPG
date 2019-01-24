@@ -10,21 +10,86 @@ import random
 import os
 import yaml
 import tensorflow as tf
+import multiprocessing
+import Queue
+
+
+class UnzipperProcess(multiprocessing.Process):
+    def __init__(self, number_of_unzippers, files_queue, result_queue, unzipper_specific_queue):
+        multiprocessing.Process.__init__(self)
+        self.number_of_unzippers = number_of_unzippers
+        self.files_queue = files_queue
+        self.result_queue = result_queue
+        self.unzipper_specific_queue = unzipper_specific_queue
+
+    def run(self):
+        while True:
+            try:
+                if self.result_queue.qsize() < self.number_of_unzippers:
+                    next_file = self.files_queue.get(block=True, timeout=1)
+                    with open(next_file, 'r') as source_file:
+                        result = pickle.load(source_file)
+                    self.result_queue.put(result)
+                    self.result_queue.task_done()
+                else:
+                    time.sleep(1)
+            except Queue.Empty:
+                pass
+            try:
+                # only option is to break
+                task_type = self.unzipper_specific_queue.get(block=True, timeout=0.001)
+                break
+            except Queue.Empty:
+                pass
+
+
+class UnzipperIterator:
+    def __init__(self, number_of_unzippers, files):
+        self.number_of_unzippers = number_of_unzippers
+        self.files = files
+
+        self.unzipper_specific_queues = [multiprocessing.JoinableQueue() for _ in range(number_of_unzippers)]
+        self.files_queue = multiprocessing.JoinableQueue()
+        self.results_queue = multiprocessing.JoinableQueue()
+
+        self.unzippers = [UnzipperProcess(
+            number_of_unzippers, self.files_queue, self.results_queue, self.unzipper_specific_queues[i])
+            for i in range(number_of_unzippers)]
+
+        for u in self.unzippers:
+            u.start()
+
+    def __iter__(self):
+        random.shuffle(self.files)
+        # put all the files
+        for f in self.files:
+            self.files_queue.put(f)
+        # when ready - collect the zipped files
+        for i in range(len(self.files)):
+            unzipped = self.results_queue.get()
+            yield unzipped
+
+    def end(self):
+        for u in self.unzippers:
+            u.terminate()
+        time.sleep(10)
 
 
 class RewardDataLoader:
-    def __init__(self, data_dir, status_to_read, max_read=None):
+    def __init__(self, data_dir, status_to_read, number_of_unzippers=None):
         assert os.path.exists(data_dir)
         cache_dir = data_dir.replace('supervised_data', 'supervised_data_cache')
         if not os.path.exists(cache_dir):
             self._create_cache(data_dir, cache_dir)
+
         files = [f for f in os.listdir(data_dir) if f.endswith(".pkl") and f.startswith('{}_'.format(status_to_read))]
         assert len(files) > 0
         self.cache_dir = cache_dir
-        self.files = files
-        self.max_read = max_read
+        self.files = [os.path.join(self.cache_dir, f) for f in files]
 
-        self.first_iteration_done = False
+        self.files_iterator = None
+        if number_of_unzippers is not None:
+            self.files_iterator = UnzipperIterator(number_of_unzippers, self.files)
 
     @staticmethod
     def _create_cache(data_dir, cache_dir):
@@ -42,26 +107,17 @@ class RewardDataLoader:
 
     def __iter__(self):
         random.shuffle(self.files)
-        files_to_keep = []
-        row_counter = 0
-        result = []
-        for f in self.files:
-            # with bz2.BZ2File(os.path.join(self.cache_dir, f), 'r') as compressed_file:
-            #     result = pickle.load(compressed_file)
-            with open(os.path.join(self.cache_dir, f), 'r') as source_file:
-                result = pickle.load(source_file)
-            row_counter += len(result)
-            if not self.first_iteration_done and self.max_read is not None:
-                files_to_keep.append(f)
-                if row_counter > self.max_read:
-                    break
-            yield result
-            result = []
-        if not self.first_iteration_done:
-            self.first_iteration_done = True
-            if self.max_read is not None:
-                self.files = files_to_keep
-        yield result
+        if self.files_iterator is None:
+            for f in self.files:
+                with open(f, 'r') as source_file:
+                    yield pickle.load(source_file)
+        else:
+            for content in self.files_iterator:
+                yield content
+
+    def stop(self):
+        if self.files_iterator is not None:
+            self.files_iterator.end()
 
 
 class Batcher:
@@ -86,18 +142,19 @@ class Batcher:
 
 
 class Oversampler:
-    def __init__(self, data_dir, free_class_batch_size, oversample_goal, oversample_collision, max_read=None, shuffle_batch_multiplier=2):
+    def __init__(self, data_dir, free_class_batch_size, oversample_goal, oversample_collision,
+                 shuffle_batch_multiplier=2, number_of_unzippers=None):
         self.data_dir = data_dir
         self.oversample_goal = oversample_goal
         self.oversample_collision = oversample_collision
 
         # load data
-        free_transitions_iterator = RewardDataLoader(data_dir, 1, max_read)
-        self.all_collisions = self._load_all(RewardDataLoader(data_dir, 2, max_read))
-        self.all_goals = self._load_all(RewardDataLoader(data_dir, 3, max_read))
-        self._describe_data(free_transitions_iterator)
+        self.all_collisions = self._load_all(RewardDataLoader(data_dir, 2, None))
+        self.all_goals = self._load_all(RewardDataLoader(data_dir, 3, None))
+        self.free_transitions_iterator = RewardDataLoader(data_dir, 1, number_of_unzippers=number_of_unzippers)
+        self._describe_data(self.free_transitions_iterator)
 
-        inner_batcher = Batcher(free_transitions_iterator, free_class_batch_size * shuffle_batch_multiplier, True)
+        inner_batcher = Batcher(self.free_transitions_iterator, free_class_batch_size * shuffle_batch_multiplier, True)
         self.batcher = Batcher(inner_batcher, free_class_batch_size, False)
 
     def _describe_data(self, free_transitions_iterator):
@@ -135,6 +192,9 @@ class Oversampler:
         for free_transition_batch in self.batcher:
             yield self._oversample_result(free_transition_batch)
 
+    def stop(self):
+        self.free_transitions_iterator.stop()
+
 
 model_name = datetime.datetime.fromtimestamp(time.time()).strftime('%Y_%m_%d_%H_%M_%S')
 
@@ -166,10 +226,14 @@ if scenario == 'vision':
 train_data_dir = os.path.join(base_data_dir, 'train')
 test_data_dir = os.path.join(base_data_dir, 'test')
 
-# train = Oversampler(train_data_dir, batch_size, oversample_goal, oversample_collision, max_read=10000)
-# test = Oversampler(test_data_dir, batch_size, oversample_goal, oversample_collision, max_read=10000)
-train = Oversampler(train_data_dir, batch_size, oversample_goal, oversample_collision)
-test = Oversampler(train_data_dir, batch_size, oversample_goal, oversample_collision)
+
+# number_of_unzippers = None
+number_of_unzippers = 1
+
+train = Oversampler(train_data_dir, batch_size, oversample_goal, oversample_collision,
+                    number_of_unzippers=number_of_unzippers)
+test = Oversampler(test_data_dir, batch_size, oversample_goal, oversample_collision,
+                   number_of_unzippers=number_of_unzippers)
 
 # get openrave manager
 openrave_manager = OpenraveManager(0.001, PotentialPoint.from_config(config))
@@ -317,3 +381,6 @@ with tf.Session(
             if epoch % save_every_epochs == save_every_epochs-1:
                 pre_trained_reward.saver.save(sess, os.path.join(saver_dir, 'reward'), global_step=current_global_step)
         print 'done epoch {} of {}, global step {}'.format(epoch, epochs, current_global_step)
+
+train.stop()
+test.stop()
