@@ -337,6 +337,10 @@ def run_for_config(config, print_messages):
                     best_model_path = best_saver.save(sess, os.path.join(saver_dir, 'best'), global_step=global_step)
             if update_index % config['general']['save_model_every_cycles'] == 0:
                 latest_saver.save(sess, os.path.join(saver_dir, 'last_iteration'), global_step=global_step)
+            # see if max score reached (even if validation is not 100%, there will no longer be any model updates...)
+            if best_model_test_success_rate > 0.99999:
+                print 'stoping run: best test success rate reached {}'.format(best_model_test_success_rate)
+                break
 
         # final test at the end
         is_best, best_model_global_step, best_model_test_success_rate = do_test(
