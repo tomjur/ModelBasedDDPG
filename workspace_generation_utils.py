@@ -179,12 +179,13 @@ class WorkspaceGenerator:
     max_angle = np.pi
 
     def __init__(self, print_info=True, min_obstacles=1, max_obstacles=3, min_center=0.2, max_center=0.3,
-                 min_side=0.01, max_side=0.1):
+                 min_side=0.01, max_side=0.1, obstacle_count_probabilities=None):
         # should print parameters?
         self.print_info = print_info
         # parameters that control the generation random process
         self.min_obstacles = min_obstacles
         self.max_obstacles = max_obstacles
+        self.obstacle_count_probabilities = obstacle_count_probabilities
         self.min_center = min_center
         self.max_center = max_center
         self.min_side = min_side
@@ -234,7 +235,14 @@ class WorkspaceGenerator:
 
     def generate_workspace(self):
         result = WorkspaceParams()
-        number_of_obstacles = randint(self.min_obstacles, self.max_obstacles)
+        if self.obstacle_count_probabilities is None:
+            number_of_obstacles = randint(self.min_obstacles, self.max_obstacles)
+        else:
+            count, probabilities = [], []
+            for c in self.obstacle_count_probabilities:
+                count.append(c)
+                probabilities.append(self.obstacle_count_probabilities[c])
+            number_of_obstacles = np.random.choice(count, p=probabilities)
         result.number_of_obstacles = number_of_obstacles
         self._print_variable('number_of_obstacles', number_of_obstacles)
         for i in range(number_of_obstacles):

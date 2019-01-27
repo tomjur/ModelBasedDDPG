@@ -9,19 +9,19 @@ from openrave_manager import OpenraveManager
 from potential_point import PotentialPoint
 from workspace_generation_utils import *
 
-# number_of_workspaces = 10
-# number_of_workers = 2
-# test_trajectories = 100
-# attempts_to_find_single_trajectory = 100
-# trajectories_required_to_pass = 5
-# planner_iterations = 150
+number_of_workspaces = 10
+number_of_workers = 2
+test_trajectories = 100
+attempts_to_find_single_trajectory = 100
+trajectories_required_to_pass = 5
+planner_iterations = 150
 
-number_of_workspaces = 1000
-number_of_workers = 72
-test_trajectories = 1000
-attempts_to_find_single_trajectory = 1000
-trajectories_required_to_pass = 500
-planner_iterations = 1500
+# number_of_workspaces = 1000
+# number_of_workers = 72
+# test_trajectories = 1000
+# attempts_to_find_single_trajectory = 1000
+# trajectories_required_to_pass = 100
+# planner_iterations = 1500
 
 output_dir = 'vision_workspaces'
 if not os.path.exists(output_dir):
@@ -42,7 +42,7 @@ class WorkerQueue(multiprocessing.Process):
         self.worker_specific_queue = worker_specific_queue
         self.results_queue = results_queue
         # members
-        self.generator = WorkspaceGenerator()
+        self.generator = WorkspaceGenerator(obstacle_count_probabilities={2: 0.05, 3: 0.5, 4: 0.4, 5: 0.05})
         config_path = os.path.join(os.getcwd(), 'config/config.yml')
         with open(config_path, 'r') as yml_file:
             self.config = yaml.load(yml_file)
@@ -94,7 +94,8 @@ class WorkerQueue(multiprocessing.Process):
             workspace_params = self.generator.generate_workspace()
             self.openrave_manager = OpenraveManager(self.config['openrave_rl']['segment_validity_step'],
                                                     PotentialPoint.from_config(self.config))
-            self.openrave_manager.load_params(workspace_params)
+            self.openrave_manager.loaded_params_path = None
+            self.openrave_manager.load_params(workspace_params, '')
             successful_trajectories_count = 0
             i = 0
             for i in range(self.test_trajectories):
@@ -104,7 +105,7 @@ class WorkerQueue(multiprocessing.Process):
                     print 'no hope to get the required ratio'
                     break
                 # try a trajectory
-                successful_trajectories_count += self._try_plan(workspace_params, self.openrave_manager)
+                successful_trajectories_count += self._try_plan(workspace_params, self.openrave_manager) is not None
                 # if successful update the status
                 if successful_trajectories_count >= self.trajectories_required_to_pass:
                     print 'workspace found'
