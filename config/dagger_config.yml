@@ -6,11 +6,12 @@ general:
   actor_processes: 8
 #  actor_processes:
 #  actor_processes: 1
-  episodes_per_update: 16
+  openrave_processes: 10
   max_path_slack: 1.5
   scenario: 'simple'
 #  scenario: 'hard'
   train_files: 160
+  train_transition_files: 10
   test_files: 40
 
 test:

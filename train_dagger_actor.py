@@ -12,7 +12,6 @@ import multiprocessing
 import Queue
 
 from network import Network
-from openrave_manager import OpenraveManager
 from openrave_rl_interface import OpenraveRLInterface
 from potential_point import PotentialPoint
 from rollout_manager import ActorProcess
@@ -335,8 +334,11 @@ best_saver = tf.train.Saver(max_to_keep=2, save_relative_paths=saver_dir)
 
 
 class TransitionDataLoader:
-    def __init__(self, files):
-        self.files = files + [None]
+    def __init__(self, files, limit_files=None):
+        self.files = files
+        if limit_files is not None:
+            self.files = self.files[:limit_files]
+        self.files = self.files + [None]
         self.extra_transitions = []
 
     def __iter__(self):
@@ -380,41 +382,125 @@ class Batcher:
         yield current_batch
 
 
-train_transition_data_loader = TransitionDataLoader(train_transition_files)
+train_transition_data_loader = TransitionDataLoader(train_transition_files, config['general']['train_transition_files'])
 train_batcher = Batcher(train_transition_data_loader, batch_size, True)
 test_batcher = Batcher(TransitionDataLoader(test_transition_files), test_batch_size, True)
 
 
-potential_points = PotentialPoint.from_config(config)
-openrave_manager = OpenraveManager(config['openrave_rl']['segment_validity_step'], potential_points)
-openrave_manager.set_params(config['general']['params_file'])
+class OpenravePlannerProcess(multiprocessing.Process):
+    def __init__(self, config, generate_plan_queue, result_queue, planner_specific_queue):
+        multiprocessing.Process.__init__(self)
+        self.generate_plan_queue = generate_plan_queue
+        self.result_queue = result_queue
+        self.planner_specific_queue = planner_specific_queue
+        self.config = config
+        # members to set at runtime
+        self.openrave_interface = None
 
-
-def create_dagger_transitions(all_train_episodes):
-    result = []
-    plans_counter = sum([len(e[0][1])-1 for e in all_train_episodes])
-    print 'need to plan for {} states'.format(plans_counter)
-    plan_index = 0
-    for e in all_train_episodes:
-        # status = e[0][0]
-        states = [[0.0] + list(s[0]) for s in e[0][1]]
-        goal_state = e[2][0][-1]
-        goal_pose = openrave_manager.get_target_pose(goal_state)
-        for i in range(len(states)-1):
-            start_state = states[0]
-            traj = openrave_manager.plan(start_state, goal_state, config['openrave_rl']['planner_iterations'])
-            plan_index += 1
-            if plan_index % 100 == 0:
-                print 'planned for {} states'.format(plan_index)
-
-            if traj is not None:
-                direction = np.array(traj[0])-np.array(traj[1])
-                direction_size = np.linalg.norm(direction)
+    def _run_query(self, query_params):
+        t = None
+        start_state = query_params[0]
+        goal_state = query_params[1]
+        goal_pose = self.openrave_interface.openrave_manager.get_target_pose(goal_state)
+        traj = self.openrave_interface.openrave_manager.plan(start_state, goal_state, config['openrave_rl']['planner_iterations'])
+        if traj is not None:
+            direction = np.array(traj[0]) - np.array(traj[1])
+            direction_size = np.linalg.norm(direction)
+            if direction_size > 0.00001:
                 direction /= direction_size
                 direction *= config['openrave_rl']['action_step_size']
                 next_state = start_state + direction
                 t = [list(start_state[1:]), list(next_state[1:]), list(goal_state[1:]), goal_pose]
-                result.append(t)
+        return t
+
+    def _run_main_loop(self):
+        while True:
+            try:
+                # wait 1 second for a trajectory request
+                query_params = self.generate_plan_queue.get(block=True, timeout=1)
+                t = self._run_query(query_params)
+                self.result_queue.put(t)
+                self.generate_plan_queue.task_done()
+            except Queue.Empty:
+                pass
+            try:
+                next_actor_specific_task = self.planner_specific_queue.get(block=True, timeout=0.001)
+                self.planner_specific_queue.task_done()
+                break
+            except Queue.Empty:
+                pass
+
+    def run(self):
+        params_file = os.path.abspath(os.path.expanduser(self.config['general']['params_file']))
+        self.openrave_interface = OpenraveRLInterface(self.config)
+        self.openrave_interface.openrave_manager.set_params(params_file)
+        self._run_main_loop()
+
+
+class OpenravePlannerManager:
+    def __init__(self, config):
+        self.episode_generation_queue = multiprocessing.JoinableQueue()
+        self.episode_results_queue = multiprocessing.Queue()
+
+        actor_processes = config['general']['openrave_processes']
+
+        self.planner_specific_queues = [multiprocessing.JoinableQueue() for _ in range(actor_processes)]
+
+        self.planner_processes = [
+            OpenravePlannerProcess(copy.deepcopy(config), self.episode_generation_queue, self.episode_results_queue,
+                                   self.planner_specific_queues [i])
+            for i in range(actor_processes)
+        ]
+
+        # start all the actor processes
+        for p in self.planner_processes:
+            p.start()
+
+    def generate_transitions(self, queries):
+        # use collectors to generate queries
+        for q in queries:
+            self.episode_generation_queue.put(q)
+
+        self.episode_generation_queue.join()
+
+        transitions = []
+        for i in range(len(queries)):
+            t = self.episode_results_queue.get()
+            if t is not None:
+                transitions.append(t)
+
+        return transitions
+
+    def end(self):
+        message = (1, )
+        self._post_private_message(message, self.planner_specific_queues)
+        time.sleep(10)
+        for p in self.planner_processes:
+            p.terminate()
+        time.sleep(10)
+
+    @staticmethod
+    def _post_private_message(message, queues):
+        for queue in queues:
+            queue.put(message)
+        for queue in queues:
+            queue.join()
+
+
+planner_manager = OpenravePlannerManager(config)
+
+
+def create_dagger_transitions(all_train_episodes):
+    plans_counter = sum([len(e[0][1])-1 for e in all_train_episodes])
+    print 'need to plan for {} states'.format(plans_counter)
+    queries = []
+    for e in all_train_episodes:
+        # status = e[0][0]
+        states = [[0.0] + list(s[0]) for s in e[0][1]]
+        goal_state = e[2][0][-1]
+        for i in range(len(states)-1):
+            queries.append((states[i], goal_state))
+    result = planner_manager.generate_transitions(queries)
     return result
 
 

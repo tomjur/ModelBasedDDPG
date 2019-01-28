@@ -14,7 +14,7 @@ class TrajectoryEval:
         pickle.dump(PotentialPoint.from_config(config), open(potential_points_path, 'w'))
         self._is_vision = config['model']['consider_image']
 
-    def eval(self, global_step, number_of_episodes, is_train=False):
+    def eval(self, global_step, number_of_episodes, is_train=False, return_episodes=False):
         successful_episodes = 0
         collision_episodes = 0
         max_len_episodes = 0
@@ -41,7 +41,10 @@ class TrajectoryEval:
                 self.save_trajectory(states, goal_pose, successful_episodes, 'success', global_step, workspace_id)
                 successful_episodes += 1
         mean_total_reward /= number_of_episodes
-        return episodes, successful_episodes, collision_episodes, max_len_episodes, mean_total_reward
+        if return_episodes:
+            return episodes, successful_episodes, collision_episodes, max_len_episodes, mean_total_reward, episode_results
+        else:
+            return episodes, successful_episodes, collision_episodes, max_len_episodes, mean_total_reward
 
     def save_trajectory(self, trajectory, goal_pose, path_index, header, global_step, workspace_id):
         # get the joints
