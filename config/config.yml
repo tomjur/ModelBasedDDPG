@@ -1,28 +1,27 @@
 general:
   name:
   random_seed: 123
-#  random_seed: 456
-#  random_seed: 789
-  updates_cycle_count: 4000 # simple
-#  updates_cycle_count: 5000 # hard
-#  updates_cycle_count: 10000 # vision
+#  random_seed: 234
+#  random_seed: 345
+#  updates_cycle_count: 4000 # simple
+  updates_cycle_count: 5000 # hard, vision
   episodes_per_update: 16
   model_updates_per_cycle: 40
   max_path_slack: 1.5
-  gpu_usage: 0.01
-#  gpu_usage: 0.1 # vision
-  actor_gpu_usage: 0.01
-#  actor_gpu_usage: 0.1 # vision
-#  actor_processes: 8
-#  actor_processes: 6 # vision
-  actor_processes:
+#  gpu_usage: 0.01
+  gpu_usage: 0.1 # vision
+#  actor_gpu_usage: 0.01
+  actor_gpu_usage: 0.1 # vision
+#  actor_processes: 9
+  actor_processes: 6 # vision
+#  actor_processes:
 #  actor_processes: 1
   write_train_summaries: 500
   save_model_every_cycles: 100
 #  scenario: 'no_obstacles'
-  scenario: 'simple'
+#  scenario: 'simple'
 #  scenario: 'hard'
-#  scenario: 'vision'
+  scenario: 'vision'
 
 openrave_rl:
   action_step_size: 0.025
@@ -55,9 +54,8 @@ model:
   alter_episode_expert: 0  # natural reward and original episode
 #  alter_episode_expert: 1  # use learned reward with episode truncation
 #  alter_episode_expert: 2  # use learned reward without episode truncation
-#  failed_motion_planner_trajectories:
-  failed_motion_planner_trajectories: 8
-#  failed_motion_planner_trajectories: 0
+#  failed_motion_planner_trajectories: 8
+  failed_motion_planner_trajectories: 0
 
 test:
   test_every_cycles: 50
@@ -72,8 +70,8 @@ hindsight:
 #  type: 'goal'
   type: 'future'
   k: 4
-  score_with_reward_model: True
-#  score_with_reward_model: False
+#  score_with_reward_model: True
+  score_with_reward_model: False
 
 actor:
   learning_rate: 0.001
@@ -99,6 +97,6 @@ critic:
 #  last_layer_tanh: True
   last_layer_tanh: False
 
-#reward:
-#  activation: 'elu'
-#  layers: [100, 100, 100, 100]
+reward:
+  activation: 'elu'
+  layers: [100, 100, 100, 100]
