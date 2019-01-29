@@ -398,19 +398,16 @@ class OpenravePlannerProcess(multiprocessing.Process):
         self.openrave_interface = None
 
     def _run_query(self, query_params):
-        transitions_list = []
         start_state = query_params[0]
         goal_state = query_params[1]
         goal_pose = self.openrave_interface.openrave_manager.get_target_pose(goal_state)
         traj = self.openrave_interface.openrave_manager.plan(start_state, goal_state, config['openrave_rl']['planner_iterations'])
         if traj is not None:
             split_traj = OpenraveRLInterface.split_trajectory(traj, config['openrave_rl']['action_step_size'])
-            for i in range(len(split_traj)-1):
-                current_state = split_traj[i]
-                next_state = split_traj[i+1]
-                t = [current_state[1:], next_state[1:], goal_state[1:], goal_pose]
-                transitions_list.append(t)
-        return transitions_list
+            current_state = split_traj[0]
+            next_state = split_traj[1]
+            return [current_state[1:], next_state[1:], goal_state[1:], goal_pose]
+        return None
 
     def _run_main_loop(self):
         while True:
@@ -464,8 +461,9 @@ class OpenravePlannerManager:
 
         transitions = []
         for i in range(len(queries)):
-            episode_transitions_list = self.episode_results_queue.get()
-            transitions.extend(episode_transitions_list)
+            transition = self.episode_results_queue.get()
+            if transition is not None:
+                transitions.append(transition)
 
         return transitions
 
@@ -496,13 +494,13 @@ def create_dagger_transitions(all_train_episodes):
         status = e[0][0]
         states = [[0.0] + list(s[0]) for s in e[0][1]]
         goal_state = e[2][0][-1]
-        if status == 1:
-            # max length - plan for the middle state
-            middle_state_index = (len(states)-1) / 2
-            queries.append((states[middle_state_index], goal_state))
-        elif status == 2:
-            # collision - plan for next to last state
-            queries.append((states[len(states) - 2], goal_state))
+        if status == 2:
+            # collision - take several states from last
+            states = states[:-1]
+            transitions_to_take = config['model']['k_transitions']
+            if len(states) > transitions_to_take:
+                states = states[-transitions_to_take:]
+            queries.extend([(s, goal_state) for s in states])
     result = planner_manager.generate_transitions(queries)
     return result
 

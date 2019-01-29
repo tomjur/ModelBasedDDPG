@@ -34,6 +34,7 @@ model:
   potential_points: [5, -0.02, 0.035]
   consider_image: False
   dagger_episodes_per_epoch: 500
+  k_transitions: 5
 
 action_predictor:
   layers: [200, 200, 200, 200]
