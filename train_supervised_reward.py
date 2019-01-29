@@ -227,8 +227,7 @@ train_data_dir = os.path.join(base_data_dir, 'train')
 test_data_dir = os.path.join(base_data_dir, 'test')
 
 
-# number_of_unzippers = None
-number_of_unzippers = 1
+number_of_unzippers = config['general']['number_of_unzippers']
 
 train = Oversampler(train_data_dir, batch_size, oversample_goal, oversample_collision,
                     number_of_unzippers=number_of_unzippers)
