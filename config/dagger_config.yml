@@ -3,15 +3,16 @@ general:
   save_every_epochs: 5
   gpu_usage: 0.01
   actor_gpu_usage: 0.01
-  actor_processes: 8
+  actor_processes: 10
 #  actor_processes:
 #  actor_processes: 1
   openrave_processes: 10
+#  openrave_processes: 1
   max_path_slack: 1.5
   scenario: 'simple'
 #  scenario: 'hard'
   train_files: 160
-  train_transition_files: 10
+  train_transition_files: 14 # starting with 14K transitions
   test_files: 40
 
 test:
@@ -32,7 +33,7 @@ model:
   batch_size: 1024
   potential_points: [5, -0.02, 0.035]
   consider_image: False
-  dagger_episodes_per_epoch: 50
+  dagger_episodes_per_epoch: 500
 
 action_predictor:
   layers: [200, 200, 200, 200]

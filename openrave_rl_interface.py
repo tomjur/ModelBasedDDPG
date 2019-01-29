@@ -74,7 +74,7 @@ class OpenraveRLInterface:
             elif self.max_planner_iterations > self.planner_iterations_start + self.planner_iterations_decrease:
                 # if plan was found, maybe we need less iterations
                 self.max_planner_iterations -= self.planner_iterations_decrease
-                return self._split_trajectory(traj)
+                return self.split_trajectory(traj, self.action_step_size)
 
     def start_new_random(self, allowed_start_goal_difference=None, return_traj=False):
         traj = self.find_random_trajectory(allowed_start_goal_difference)
@@ -150,21 +150,21 @@ class OpenraveRLInterface:
             self.current_joints = next_joints
         return list(next_joints), reward, is_terminal, enum_res
 
-    def _split_trajectory(self, trajectory):
-        max_step = self.action_step_size
+    @staticmethod
+    def split_trajectory(trajectory, action_step_size):
         res = [tuple(trajectory[0])]
         for i in range(len(trajectory) - 1):
             current_step = np.array(trajectory[i])
             next_step = np.array(trajectory[i + 1])
             difference = next_step - current_step
             difference_norm = np.linalg.norm(difference)
-            if difference_norm < max_step:
+            if difference_norm < action_step_size:
                 # if smaller than allowed step just append the next step
                 res.append(tuple(trajectory[i + 1]))
                 continue
-            scaled_step = (max_step / difference_norm) * difference
+            scaled_step = (action_step_size / difference_norm) * difference
             steps = []
-            for alpha in range(int(np.floor(difference_norm / max_step))):
+            for alpha in range(int(np.floor(difference_norm / action_step_size))):
                 processed_step = current_step + (1 + alpha) * scaled_step
                 steps.append(processed_step)
             # we probably have a leftover section, append it to res
