@@ -10,7 +10,8 @@ from potential_point import PotentialPoint
 
 class Network(object):
     def __init__(self, config, is_rollout_agent, image_shape=(55, 111), number_of_joints=4, pose_dimensions=2,
-                 pre_trained_reward=None):
+                 pre_trained_reward=None, name_prefix=None):
+        self.name_prefix = os.getpid() if name_prefix is None else name_prefix
         self.config = config
         self.potential_points = PotentialPoint.from_config(config)
 
@@ -275,7 +276,7 @@ class Network(object):
         return result
 
     def _create_actor_network(self, joints_input, is_online, reuse_flag):
-        name_prefix = '{}_actor_{}'.format(os.getpid(), 'online' if is_online else 'target')
+        name_prefix = '{}_actor_{}'.format(self.name_prefix, 'online' if is_online else 'target')
         activation = get_activation(self.config['action_predictor']['activation'])
         layers = self.config['action_predictor']['layers'] + [self.number_of_joints]
         current = self._generate_policy_features(joints_input, name_prefix, reuse_flag)
@@ -291,7 +292,7 @@ class Network(object):
         return action, tanh_preactivation
 
     def _create_critic_network(self, joints_input, action_input, is_online, reuse_flag, add_regularization_loss):
-        name_prefix = '{}_critic_{}'.format(os.getpid(), 'online' if is_online else 'target')
+        name_prefix = '{}_critic_{}'.format(self.name_prefix, 'online' if is_online else 'target')
         layers_before_action = self.config['critic']['layers_before_action']
         layers_after_action = self.config['critic']['layers_after_action']
         activation = get_activation(self.config['critic']['activation'])
