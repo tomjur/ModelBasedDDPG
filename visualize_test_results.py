@@ -3,14 +3,108 @@ import bz2
 import numpy as np
 import matplotlib.pyplot as plt
 
+# groups_to_test_results_files = {
+#     'DDPG': [
+#         '/home/tom/paper_results/simple_scenario/trajectories/ddpg4/test_results.test_results_pkl',
+#         '/home/tom/paper_results/simple_scenario/trajectories/ddpg5/test_results.test_results_pkl',
+#         '/home/tom/paper_results/simple_scenario/trajectories/ddpg6/test_results.test_results_pkl',
+#     ],
+#     'DDPG-MP (no expert)': [
+#         '/home/tom/paper_results/simple_scenario/trajectories/ddpgmp4/test_results.test_results_pkl',
+#         '/home/tom/paper_results/simple_scenario/trajectories/ddpgmp5/test_results.test_results_pkl',
+#         '/home/tom/paper_results/simple_scenario/trajectories/ddpgmp6/test_results.test_results_pkl',
+#     ],
+# }
+# title = 'Simple scenario'
+
+# groups_to_test_results_files = {
+#     'DDPG': [
+#         '/home/tom/paper_results/hard_scenario/trajectories/ddpg1/test_results.test_results_pkl',
+#         '/home/tom/paper_results/hard_scenario/trajectories/ddpg2/test_results.test_results_pkl',
+#         '/home/tom/paper_results/hard_scenario/trajectories/ddpg3/test_results.test_results_pkl',
+#     ],
+#     'DDPG+HER': [
+#         '/home/tom/paper_results/hard_scenario/trajectories/ddpg_her1/test_results.test_results_pkl',
+#         '/home/tom/paper_results/hard_scenario/trajectories/ddpg_her2/test_results.test_results_pkl',
+#         '/home/tom/paper_results/hard_scenario/trajectories/ddpg_her3/test_results.test_results_pkl',
+#     ],
+#     'DDPG-MP (full)': [
+#         '/home/tom/paper_results/hard_scenario/trajectories/ddpgmp1/test_results.test_results_pkl',
+#         '/home/tom/paper_results/hard_scenario/trajectories/ddpgmp2/test_results.test_results_pkl',
+#         '/home/tom/paper_results/hard_scenario/trajectories/ddpgmp3/test_results.test_results_pkl',
+#     ],
+#     'DDPG-MP (no expert)': [
+#         '/home/tom/paper_results/hard_scenario/trajectories/ddpgmp_no_score1/test_results.test_results_pkl',
+#         '/home/tom/paper_results/hard_scenario/trajectories/ddpgmp_no_score2/test_results.test_results_pkl',
+#         '/home/tom/paper_results/hard_scenario/trajectories/ddpgmp_no_score3/test_results.test_results_pkl',
+#     ],
+#     'DDPG-MP+HER (no expert)': [
+#         '/home/tom/paper_results/hard_scenario/trajectories/ddpgmp_no_score_her_k1_1/test_results.test_results_pkl',
+#         '/home/tom/paper_results/hard_scenario/trajectories/ddpgmp_no_score_her_k1_2/test_results.test_results_pkl',
+#         '/home/tom/paper_results/hard_scenario/trajectories/ddpgmp_no_score_her_k1_3/test_results.test_results_pkl',
+#     ],
+# }
+# title = 'Hard scenario'
+
+# groups_to_test_results_files = {
+#     'DDPG': [
+#         '/home/tom/paper_results/hard_scenario/trajectories/ddpg1/test_results.test_results_pkl',
+#         '/home/tom/paper_results/hard_scenario/trajectories/ddpg2/test_results.test_results_pkl',
+#         '/home/tom/paper_results/hard_scenario/trajectories/ddpg3/test_results.test_results_pkl',
+#     ],
+#     'DDPG+HER': [
+#         '/home/tom/paper_results/hard_scenario/trajectories/ddpg_her1/test_results.test_results_pkl',
+#         '/home/tom/paper_results/hard_scenario/trajectories/ddpg_her2/test_results.test_results_pkl',
+#         '/home/tom/paper_results/hard_scenario/trajectories/ddpg_her3/test_results.test_results_pkl',
+#     ],
+#     'DDPG-MP (our method)': [
+#         '/home/tom/paper_results/hard_scenario/trajectories/ddpgmp1/test_results.test_results_pkl',
+#         '/home/tom/paper_results/hard_scenario/trajectories/ddpgmp2/test_results.test_results_pkl',
+#         '/home/tom/paper_results/hard_scenario/trajectories/ddpgmp3/test_results.test_results_pkl',
+#     ],
+#     # 'DDPG-MP (no expert)': [
+#     #     '/home/tom/paper_results/hard_scenario/trajectories/ddpgmp_no_score1/test_results.test_results_pkl',
+#     #     '/home/tom/paper_results/hard_scenario/trajectories/ddpgmp_no_score2/test_results.test_results_pkl',
+#     #     '/home/tom/paper_results/hard_scenario/trajectories/ddpgmp_no_score3/test_results.test_results_pkl',
+#     # ],
+#     # 'DDPG-MP+HER (no expert)': [
+#     #     '/home/tom/paper_results/hard_scenario/trajectories/ddpgmp_no_score_her_k1_1/test_results.test_results_pkl',
+#     #     '/home/tom/paper_results/hard_scenario/trajectories/ddpgmp_no_score_her_k1_2/test_results.test_results_pkl',
+#     #     '/home/tom/paper_results/hard_scenario/trajectories/ddpgmp_no_score_her_k1_3/test_results.test_results_pkl',
+#     # ],
+# }
+# title = 'Hard scenario - comparing DDPG-MP to baselines'
+
 groups_to_test_results_files = {
-    'DDPG': [
-        '/home/tom/paper_results/simple_scenario/trajectories/ddpg1/test_results.test_results_pkl',
-        '/home/tom/paper_results/simple_scenario/trajectories/ddpg2/test_results.test_results_pkl',
-        '/home/tom/paper_results/simple_scenario/trajectories/ddpg3/test_results.test_results_pkl',
-    ]
+    # 'DDPG': [
+    #     '/home/tom/paper_results/hard_scenario/trajectories/ddpg1/test_results.test_results_pkl',
+    #     '/home/tom/paper_results/hard_scenario/trajectories/ddpg2/test_results.test_results_pkl',
+    #     '/home/tom/paper_results/hard_scenario/trajectories/ddpg3/test_results.test_results_pkl',
+    # ],
+    # 'DDPG+HER': [
+    #     '/home/tom/paper_results/hard_scenario/trajectories/ddpg_her1/test_results.test_results_pkl',
+    #     '/home/tom/paper_results/hard_scenario/trajectories/ddpg_her2/test_results.test_results_pkl',
+    #     '/home/tom/paper_results/hard_scenario/trajectories/ddpg_her3/test_results.test_results_pkl',
+    # ],
+    'DDPG-MP (our method)': [
+        '/home/tom/paper_results/hard_scenario/trajectories/ddpgmp1/test_results.test_results_pkl',
+        '/home/tom/paper_results/hard_scenario/trajectories/ddpgmp2/test_results.test_results_pkl',
+        '/home/tom/paper_results/hard_scenario/trajectories/ddpgmp3/test_results.test_results_pkl',
+    ],
+    'DDPG-MP (no expert)': [
+        '/home/tom/paper_results/hard_scenario/trajectories/ddpgmp_no_score1/test_results.test_results_pkl',
+        '/home/tom/paper_results/hard_scenario/trajectories/ddpgmp_no_score2/test_results.test_results_pkl',
+        '/home/tom/paper_results/hard_scenario/trajectories/ddpgmp_no_score3/test_results.test_results_pkl',
+    ],
+    'DDPG-MP+HER (no expert)': [
+        '/home/tom/paper_results/hard_scenario/trajectories/ddpgmp_no_score_her_k1_1/test_results.test_results_pkl',
+        '/home/tom/paper_results/hard_scenario/trajectories/ddpgmp_no_score_her_k1_2/test_results.test_results_pkl',
+        '/home/tom/paper_results/hard_scenario/trajectories/ddpgmp_no_score_her_k1_3/test_results.test_results_pkl',
+    ],
 }
-title = 'simple scenario'
+title = 'Hard scenario - comparing exploration strategies'
+
+
 colors = ['blue', 'green', 'red', 'yellow', 'teal']
 
 
@@ -29,18 +123,38 @@ def load_file_as_series(test_results_file):
 
 
 def load_several_files(test_results_files):
-    episode_axis = None
-    data = None
+    # collect from each file
+    all_results = {}
+    longest_res = None
     for f in test_results_files:
         episodes_res, success_rate_res = load_file_as_series(f)
-        if episode_axis is None:
-            episode_axis = episodes_res
-            data = np.expand_dims(np.array(success_rate_res), axis=0)
+        # once 1.0 reached consider the suffix as 1.0 also
+        i = 0
+        for i, r in enumerate(success_rate_res):
+            if r == 1.0:
+                break
+        prefix_size = i + 1
+        episodes_res = episodes_res[:prefix_size]
+        success_rate_res = success_rate_res[:prefix_size]
+        all_results[f] = success_rate_res
+        # see which is the longest:
+        if longest_res is None or episodes_res[-1] > longest_res[-1]:
+            longest_res = episodes_res
+    # merge
+    data = None
+    for f in all_results:
+        success_rate_res = all_results[f]
+        # need to add 1.0 elements
+        count = len(longest_res) - len(success_rate_res)
+        if count > 0:
+            success_rate_res = success_rate_res + [1.0] * count
+        new_data = np.expand_dims(np.array(success_rate_res), axis=0)
+        if data is None:
+            data = new_data
         else:
-            assert episodes_res == episode_axis
-            new_data = np.expand_dims(np.array(success_rate_res), axis=0)
             data = np.concatenate((data, new_data), axis=0)
-    return episode_axis, data
+
+    return longest_res, data
 
 
 def plot_group(episode_axis, data, ax, label, color):
@@ -51,6 +165,11 @@ def plot_group(episode_axis, data, ax, label, color):
         data_min = np.min(data, axis=0)
         data_max = np.max(data, axis=0)
         ax.fill_between(episode_axis, data_max, data_min, facecolor=color, alpha=0.5)
+    # if data.shape[0] > 1:
+    #     data_std = np.std(data, axis=0)
+    #     data_min = data_mean - data_std
+    #     data_max = data_mean + data_std
+    #     ax.fill_between(episode_axis, data_max, data_min, facecolor=color, alpha=0.5)
 
 
 fig, ax = plt.subplots(1)
