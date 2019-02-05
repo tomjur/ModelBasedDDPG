@@ -5,12 +5,10 @@ import yaml
 import time
 import numpy as np
 
-from data_filepaths import get_trajectory_path
 from openrave_manager import OpenraveManager
 from openravepy import *
 
 # global variables:
-from potential_point import PotentialPoint
 from workspace_generation_utils import WorkspaceParams
 
 # scenario = 'simple'
@@ -36,52 +34,21 @@ else:
     trajectories_dir = os.path.join(trajectories_dir, scenario, 'trajectories')
 
 
-# model_name = '2018_12_31_11_38_52'  # step 134040 path 71 (91, 99, 145)
-# global_step = '134040'
-# path_id = '32'
-# model_name = '2019_01_03_12_20_56' # step 72040: 30, 51, 131
-# global_step = '72040'
-# path_id = '29'
-# message = 'max_len'
-# model_name = '2019_01_06_17_08_26' # step 60040 138?
-# global_step = '60040'
-# path_id = '175'
-# model_name = '2019_01_06_17_08_26' # step 130?
-# global_step = '388040'
-# path_id = '16'
-# model_name = '2019_01_09_12_07_16' # step 260040: 53? 77? 81? 82?
-# global_step = '260040'
-# path_id = '14'
-# model_name = '2019_01_10_21_15_36' # 90? 159! 162!
-# global_step = '60040'
-# path_id = '17'
-# model_name = '2019_01_12_11_17_29'  # 14 60!!! 90!!!! 106!! 117 138 177!!!
-# global_step = '218040'
-# path_id = '177'
-# model_name = '2019_01_13_17_43_18' # 15! 29
-# global_step = '244040'
-# path_id = '15'
-
-
-# model_name = '2019_01_14_19_28_56' # 8 9 12 13 40 50 57 58 74 75 91!! 101 176!! 186! 187
-# global_step = '176040'
-# path_id = '186'
-
-model_name = '2019_01_15_20_26_24'
-global_step = '440'
-path_id = '0'
-
+model_name = ''
+global_step = '-1'
 # message = 'max_len'
 # message = 'collision'
 message = 'success'
+path_id = '0'
 
 speed = 35.0
 
 display_start_goal_end_spheres = True
 trajectory_spheres_radius = 0.01
+goal_radius = 0.04
 
 
-def create_sphere(id, radius, openrave_manager):
+def create_sphere(id, radius, openrave_manager, ):
     body = RaveCreateKinBody(openrave_manager.env, '')
     body.SetName('sphere{}'.format(id))
     body.InitFromSpheres(np.array([[0.0]*3 + [radius]]), True)
@@ -130,6 +97,10 @@ def main():
         openrave_manager.set_params(workspace_params_path)
 
     openrave_manager.get_initialized_viewer()
+    openrave_manager.env.GetViewer().SetSize(1200, 800)
+
+    # for link in openrave_manager.robot.GetLinks():
+    #     link.SetVisible(False)
 
     if display_start_goal_end_spheres:
         start = trajectory[0]
@@ -141,12 +112,13 @@ def main():
         pose_end = (pose_end[0], 0.0, pose_end[1])
         start_sphere = create_sphere('start', trajectory_spheres_radius, openrave_manager)
         move_body(start_sphere, pose_start, 0.0)
-        goal_sphere = create_sphere('goal', trajectory_spheres_radius, openrave_manager)
+        goal_sphere = create_sphere('goal', goal_radius, openrave_manager)
         move_body(goal_sphere, pose_goal, 0.0)
         end_sphere = create_sphere('end', trajectory_spheres_radius, openrave_manager)
 
         start_sphere.GetLinks()[0].GetGeometries()[0].SetDiffuseColor(np.array([0, 0, 204]))
         goal_sphere.GetLinks()[0].GetGeometries()[0].SetDiffuseColor(np.array([240, 100, 10]))
+        goal_sphere.GetLinks()[0].GetGeometries()[0].SetTransparency(0.3)
         end_sphere.GetLinks()[0].GetGeometries()[0].SetDiffuseColor(np.array([100, 204, 204]))
         move_body(end_sphere, pose_end, 0.0)
 
@@ -156,11 +128,10 @@ def main():
         openrave_manager.robot.SetDOFValues(trajectory[i])
         time.sleep(1/speed)
 
+    time.sleep(0.2)
+    if message == 'collision':
+        time.sleep(1.2)
 
-# def get_coordinate(link_transforms, attached_link_index, initial_offset):
-#     link_transform = link_transforms[attached_link_index]
-#     coordinate = np.matmul(link_transform, np.append(initial_offset, [1.0]))
-#     return coordinate[:3]
 
 if __name__ == '__main__':
     main()
