@@ -15,9 +15,24 @@ class VisionRandomStepCollectorProcess(CollectorProcess):
         workspace_id = query_params[0]
         full_workspace_path = query_params[1]
 
-        self.openrave_interface.openrave_manager.set_params(full_workspace_path)
+        openrave_manager = self.openrave_interface.openrave_manager
+        #  set the obstacles
+        openrave_manager.set_params(full_workspace_path)
 
-        start_joints, goal_joints, _ = self.openrave_interface.start_new_random(None)
+        # find free start and goal joints
+        start_joints = openrave_manager.get_random_joints({0: 0.0})
+        while not openrave_manager.is_valid(start_joints):
+            start_joints = openrave_manager.get_random_joints({0: 0.0})
+
+        goal_joints = openrave_manager.get_random_joints({0: 0.0})
+        while not openrave_manager.is_valid(goal_joints):
+            goal_joints = openrave_manager.get_random_joints({0: 0.0})
+
+        # set fake trajectory with just start and goal, make sure the interface does not verify
+        traj = [start_joints, goal_joints]
+        self.openrave_interface.start_specific(traj, verify_traj=False)
+
+        # take a random action
         random_action = np.random.uniform(-1.0, 1.0, len(start_joints) - 1)
         random_action /= np.linalg.norm(random_action)
         random_action = np.array([0.0] + list(random_action))
@@ -54,20 +69,22 @@ with open(config_path, 'r') as yml_file:
 
 config['openrave_rl']['challenging_trajectories_only'] = False
 
-# number_of_samples_per_workspace = 4
-# samples_per_file = 2
+# number_of_samples_per_workspace = 50
+# samples_per_file = 10
 # threads = 1
 # results_dir = 'supervised_data_vision_temp_to_delete'
 
 number_of_samples_per_workspace = 1000
 samples_per_file = 1000
-threads = 100
-results_dir = 'supervised_data'
+# threads = 100
+threads = 10
+results_dir = 'supervised_data_vision_harder'
 
 if not os.path.exists(results_dir):
     os.makedirs(results_dir)
 
-params_dir = os.path.abspath(os.path.expanduser('~/ModelBasedDDPG/scenario_params/vision/'))
+# params_dir = os.path.abspath(os.path.expanduser('~/ModelBasedDDPG/scenario_params/vision_harder_small/'))
+params_dir = os.path.abspath(os.path.expanduser('~/ModelBasedDDPG/scenario_params/vision_harder/'))
 image_cache = ImageCache(params_dir)
 collection_queries = []
 workspace_ids = []
@@ -77,6 +94,8 @@ for cache_item in image_cache.items.values():
 
 data_collector = VisionRandomStepDataCollector(config, threads, query_parameters=collection_queries)
 collected = 0
+
+aa = datetime.datetime.now()
 
 params_ids_to_tuples = {workspace_id: [] for workspace_id in workspace_ids}
 params_ids_to_offset = {workspace_id: 0 for workspace_id in workspace_ids}
@@ -106,6 +125,9 @@ while collected < len(collection_queries):
             params_ids_to_offset[workspace_id] = current_offset + samples_per_file
             params_ids_to_tuples[workspace_id] = params_ids_to_tuples[workspace_id][samples_per_file:]
         assert len(params_ids_to_tuples[workspace_id]) < samples_per_file
+
+bb = datetime.datetime.now()
+print 'collection took: {}'.format(bb - aa)
 
 for workspace_id in params_ids_to_tuples:
     assert len(params_ids_to_tuples[workspace_id]) == 0
