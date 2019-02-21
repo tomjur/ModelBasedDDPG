@@ -5,7 +5,6 @@ import bz2
 import tensorflow as tf
 import yaml
 import time
-import numpy as np
 
 from episode_editor import EpisodeEditor
 from hindsight_policy import HindsightPolicy

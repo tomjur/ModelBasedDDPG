@@ -48,8 +48,9 @@ class VisionRandomStepDataCollector(DataCollector):
 
     def _get_collector(self, config, queued_data_points, collector_specific_queue, params_file=None):
         return VisionRandomStepCollectorProcess(
-            config, queued_data_points, self.results_queue, collector_specific_queue, params_file=None,
-            query_parameters_queue=self.query_parameters_queue)
+            config, queued_data_points, self.results_queue, collector_specific_queue,
+            query_parameters_queue=self.query_parameters_queue, init_rl_interface=True
+        )
 
 
 def print_status_dist(current_buffer):
@@ -67,12 +68,14 @@ with open(config_path, 'r') as yml_file:
     print('------------ Config ------------')
     print(yaml.dump(config))
 
-config['openrave_rl']['challenging_trajectories_only'] = False
+# scenario = 'vision'
+scenario = 'vision_harder'
 
 # number_of_samples_per_workspace = 50
 # samples_per_file = 10
-# threads = 1
+# threads = 10
 # results_dir = 'supervised_data_vision_temp_to_delete'
+# scenario = 'vision_harder_small'
 
 number_of_samples_per_workspace = 1000
 samples_per_file = 1000
@@ -83,8 +86,7 @@ results_dir = 'supervised_data_vision_harder'
 if not os.path.exists(results_dir):
     os.makedirs(results_dir)
 
-# params_dir = os.path.abspath(os.path.expanduser('~/ModelBasedDDPG/scenario_params/vision_harder_small/'))
-params_dir = os.path.abspath(os.path.expanduser('~/ModelBasedDDPG/scenario_params/vision_harder/'))
+params_dir = os.path.abspath(os.path.expanduser('~/ModelBasedDDPG/scenario_params/{}/'.format(scenario)))
 image_cache = ImageCache(params_dir)
 collection_queries = []
 workspace_ids = []
