@@ -16,7 +16,7 @@ class PreTrainedReward:
         self._reuse_flag = False
 
         self.config = config
-        self.is_vision_enabled = config['general']['scenario'] == 'vision'
+        self.is_vision_enabled = 'vision' in config['general']['scenario']
 
         self.joints_inputs = tf.placeholder(tf.float32, (None, 4), name='joints_inputs')
         self.goal_joints_inputs = tf.placeholder(tf.float32, (None, 4), name='goal_joints_inputs')

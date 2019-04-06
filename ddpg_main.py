@@ -18,6 +18,10 @@ from pre_trained_reward import PreTrainedReward
 from workspace_generation_utils import *
 
 
+def _is_vision(scenario):
+    return 'vision' in scenario
+
+
 def run_for_config(config, print_messages):
     # set the name of the model
     model_name = config['general']['name']
@@ -45,7 +49,7 @@ def run_for_config(config, print_messages):
 
     # load images if required
     image_cache = None
-    if scenario == 'vision':
+    if _is_vision(scenario):
         image_cache = ImageCache(config['general']['params_file'], create_images=True)
 
     # load pretrained model if required
@@ -64,7 +68,7 @@ def run_for_config(config, print_messages):
         return joints, poses, jacobians
 
     def score_for_hindsight(augmented_buffer):
-        assert scenario != 'vision'
+        assert _is_vision(scenario)
         # unzip
         goal_pose_list, goal_joints_list, workspace_image_list, current_state_list, action_used_list, _, is_goal_list,\
         __ = zip(*augmented_buffer)
@@ -232,7 +236,7 @@ def run_for_config(config, print_messages):
         print 'final success rate is {}'.format(rate)
         return rate
 
-    allowed_batch_episode_editor = config['model']['batch_size'] if scenario == 'vision' else None
+    allowed_batch_episode_editor = config['model']['batch_size'] if _is_vision(scenario) else None
     regular_episode_editor = EpisodeEditor(
         config['model']['alter_episode'], pre_trained_reward, image_cache=image_cache,
         allowed_batch=allowed_batch_episode_editor
@@ -368,13 +372,14 @@ def run_for_config(config, print_messages):
 
 def overload_config_by_scenario(config):
     scenario = config['general']['scenario']
+    is_vision = _is_vision(scenario)
     config['general']['trajectory_directory'] = os.path.abspath(os.path.expanduser(
         os.path.join('~/ModelBasedDDPG/imitation_data/', scenario)))
     params_file = os.path.abspath(os.path.expanduser(os.path.join('~/ModelBasedDDPG/scenario_params', scenario)))
-    if scenario != 'vision':
+    if not is_vision:
         params_file = os.path.join(params_file, 'params.pkl')
     config['general']['params_file'] = params_file
-    config['model']['consider_image'] = scenario == 'vision'
+    config['model']['consider_image'] = is_vision
     config['model']['reward_model_name'] = scenario
 
 
