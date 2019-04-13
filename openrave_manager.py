@@ -70,10 +70,13 @@ class OpenraveManager(object):
         loaded = self.loaded_params_path
         if loaded is None:
             self.load_params(WorkspaceParams.load_from_file(params_path), params_path)
+            return True
         else:
             if loaded != params_path:
                 self.remove_objects()
                 self.load_params(WorkspaceParams.load_from_file(params_path), params_path)
+                return True
+            return False
 
     def get_number_of_joints(self):
         return self.robot.GetDOF()

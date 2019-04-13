@@ -9,9 +9,9 @@ from data_collector import CollectorProcess, DataCollector
 
 class TrajectoryCollectorProcess(CollectorProcess):
     def _get_tuple(self, query_params=None):
-        start_joints, goal_joints, _, trajectory = self.openrave_interface.start_new_random(None, return_traj=True)
+        trajectory = self.openrave_trajectory_generator.find_random_trajectory()
         trajectory_poses = [
-            self.openrave_interface.openrave_manager.get_potential_points_poses(step) for step in trajectory]
+            self.openrave_trajectory_generator.openrave_manager.get_potential_points_poses(step) for step in trajectory]
         return trajectory, trajectory_poses
 
 
@@ -21,7 +21,9 @@ class ImitationDataCollector(DataCollector):
 
     def _get_collector(self, config, queued_data_points, collector_specific_queue, params_file=None):
         return TrajectoryCollectorProcess(
-            config, queued_data_points, self.results_queue, collector_specific_queue, params_file)
+            config, queued_data_points, self.results_queue, collector_specific_queue, params_file,
+            init_trajectory_collector=True
+        )
 
 
 # read the config
@@ -31,15 +33,21 @@ with open(config_path, 'r') as yml_file:
     print('------------ Config ------------')
     print(yaml.dump(config))
 
-config['openrave_rl']['challenging_trajectories_only'] = True
+config['openrave_planner'] = {
+    'challenging_trajectories_only': True,
+    'planner_iterations_start': 100,
+    'planner_iterations_increase': 10,
+    'planner_iterations_decrease': 1,
+}
+
 # scenario = 'simple'
 scenario = 'hard'
 params_file = os.path.abspath(os.path.expanduser(
     os.path.join('~/ModelBasedDDPG/scenario_params', scenario, 'params.pkl')))
 
-# number_of_trajectories = 8
+# number_of_trajectories = 12
 # trajectories_per_file = 4
-# threads = 1
+# threads = 2
 # results_dir = 'imitation_data_to_delete'
 
 number_of_trajectories = 100000

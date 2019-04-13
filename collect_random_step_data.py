@@ -10,11 +10,28 @@ from data_collector import CollectorProcess, DataCollector
 
 class RandomStepCollectorProcess(CollectorProcess):
     def _get_tuple(self, query_params=None):
-        start_joints, goal_joints, _ = self.openrave_interface.start_new_random(None)
+        openrave_manager = self.openrave_interface.openrave_manager
+
+        # find free start and goal joints
+        start_joints = openrave_manager.get_random_joints({0: 0.0})
+        while not openrave_manager.is_valid(start_joints):
+            start_joints = openrave_manager.get_random_joints({0: 0.0})
+
+        goal_joints = openrave_manager.get_random_joints({0: 0.0})
+        while not openrave_manager.is_valid(goal_joints):
+            goal_joints = openrave_manager.get_random_joints({0: 0.0})
+
+        # set fake trajectory with just start and goal, make sure the interface does not verify
+        traj = [start_joints, goal_joints]
+        self.openrave_interface.start_specific(traj, verify_traj=False)
+
+        # take a random action
         random_action = np.random.uniform(-1.0, 1.0, len(start_joints) - 1)
         random_action /= np.linalg.norm(random_action)
         random_action = np.array([0.0] + list(random_action))
         next_joints, reward, terminated, status = self.openrave_interface.step(random_action)
+
+        # the result contains also the workspace used
         return start_joints, goal_joints, random_action, next_joints, reward, terminated, status
 
 
@@ -24,7 +41,8 @@ class RandomStepDataCollector(DataCollector):
 
     def _get_collector(self, config, queued_data_points, collector_specific_queue, params_file=None):
         return RandomStepCollectorProcess(
-            config, queued_data_points, self.results_queue, collector_specific_queue, params_file)
+            config, queued_data_points, self.results_queue, collector_specific_queue, params_file,
+            init_rl_interface=True)
 
 
 def print_status_dist(current_buffer):
@@ -42,11 +60,9 @@ with open(config_path, 'r') as yml_file:
     print('------------ Config ------------')
     print(yaml.dump(config))
 
-config['openrave_rl']['challenging_trajectories_only'] = False
-
 # number_of_samples = 30
 # samples_per_file = 10
-# threads = 1
+# threads = 10
 # results_dir = 'supervised_data_temp_to_delete'
 # scenario = 'hard'
 

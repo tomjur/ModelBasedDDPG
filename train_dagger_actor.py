@@ -13,6 +13,7 @@ import Queue
 
 from network import Network
 from openrave_rl_interface import OpenraveRLInterface
+from openrave_trajectory_generator import OpenraveTrajectoryGenerator
 from potential_point import PotentialPoint
 from rollout_manager import ActorProcess
 from trajectory_eval import TrajectoryEval
@@ -403,7 +404,7 @@ class OpenravePlannerProcess(multiprocessing.Process):
         goal_pose = self.openrave_interface.openrave_manager.get_target_pose(goal_state)
         traj = self.openrave_interface.openrave_manager.plan(start_state, goal_state, config['openrave_rl']['planner_iterations'])
         if traj is not None:
-            split_traj = OpenraveRLInterface.split_trajectory(traj, config['openrave_rl']['action_step_size'])
+            split_traj = OpenraveTrajectoryGenerator.split_trajectory(traj, config['openrave_rl']['action_step_size'])
             current_state = split_traj[0]
             next_state = split_traj[1]
             return [current_state[1:], next_state[1:], goal_state[1:], goal_pose]

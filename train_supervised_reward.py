@@ -220,8 +220,8 @@ scenario = config['general']['scenario']
 # base_data_dir = os.path.join('supervised_data', scenario)
 base_data_dir = os.path.join('supervised_data', scenario + '_by_status')
 image_cache = None
-if scenario == 'vision':
-    params_dir = os.path.abspath(os.path.expanduser('~/ModelBasedDDPG/scenario_params/vision/'))
+if 'vision' in scenario:
+    params_dir = os.path.abspath(os.path.expanduser('~/ModelBasedDDPG/scenario_params/{}/'.format(scenario)))
     image_cache = ImageCache(params_dir)
 train_data_dir = os.path.join(base_data_dir, 'train')
 test_data_dir = os.path.join(base_data_dir, 'test')

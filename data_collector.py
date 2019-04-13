@@ -4,19 +4,22 @@ import Queue
 import time
 
 from openrave_rl_interface import OpenraveRLInterface
-from workspace_generation_utils import WorkspaceParams
+from openrave_trajectory_generator import OpenraveTrajectoryGenerator
 
 
 class CollectorProcess(multiprocessing.Process):
     def __init__(self, config, queued_data_points, result_queue, collector_specific_queue, params_file=None,
-                 query_parameters_queue=None):
+                 query_parameters_queue=None, init_rl_interface=False, init_trajectory_collector=False):
         multiprocessing.Process.__init__(self)
         self.result_queue = result_queue
         self.collector_specific_queue = collector_specific_queue
         self.config = config
         self.params_file = params_file
         self.query_parameters_queue = query_parameters_queue
+        self.init_rl_interface = init_rl_interface
+        self.init_trajectory_collector = init_trajectory_collector
         # members to set at runtime
+        self.openrave_trajectory_generator = None
         self.openrave_interface = None
         self.queued_data_points = queued_data_points
 
@@ -46,9 +49,15 @@ class CollectorProcess(multiprocessing.Process):
                 time.sleep(1.0)
 
     def run(self):
-        self.openrave_interface = OpenraveRLInterface(self.config)
+        if self.init_trajectory_collector:
+            self.openrave_trajectory_generator = OpenraveTrajectoryGenerator(self.config)
+        if self.init_rl_interface:
+            self.openrave_interface = OpenraveRLInterface(self.config)
         if self.params_file is not None:
-            self.openrave_interface.openrave_manager.set_params(self.params_file)
+            if self.init_trajectory_collector:
+                self.openrave_trajectory_generator.openrave_manager.set_params(self.params_file)
+            if self.init_rl_interface:
+                self.openrave_interface.openrave_manager.set_params(self.params_file)
         self._run_main_loop()
 
 
