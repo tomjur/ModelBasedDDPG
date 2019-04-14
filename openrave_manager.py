@@ -10,8 +10,9 @@ from workspace_generation_utils import WorkspaceParams
 
 class OpenraveManager(object):
     def __init__(self, segment_validity_step, potential_points):
-        env_path = os.path.abspath(
-            os.path.expanduser('~/ModelBasedDDPG/config/widowx_env.xml'))
+        # env_path = os.path.abspath(
+        #     os.path.expanduser('~/ModelBasedDDPG/config/widowx_env.xml'))
+        env_path = os.path.join(os.getcwd(), 'data', 'config', 'widowx_env.xml')
         self.env = Environment()
         self.env.StopSimulation()
         self.env.Load(env_path)  # load a simple scene

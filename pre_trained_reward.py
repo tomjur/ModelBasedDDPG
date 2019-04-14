@@ -35,7 +35,7 @@ class PreTrainedReward:
 
         # model path to load
         self.model_name = model_name
-        self.saver_dir = os.path.join('reward', 'model', model_name)
+        self.saver_dir = os.path.join(os.getcwd(), 'data', 'reward', 'model', model_name)
         assert os.path.exists(self.saver_dir)
         self.saver = tf.train.Saver(reward_variables, max_to_keep=4, save_relative_paths=self.saver_dir)
 

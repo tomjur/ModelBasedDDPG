@@ -1,0 +1,8 @@
+version: '3'
+services:
+  openrave_gpu:
+    image: tomjur/openrave_gpu:ddpgmp
+    volumes:
+      - ~/ModelBasedDDPG/data:/data
+
+

@@ -8,20 +8,21 @@ general:
   episodes_per_update: 16
   model_updates_per_cycle: 40
   max_path_slack: 1.5
-#  gpu_usage: 0.01
-  gpu_usage: 0.1 # vision
-#  actor_gpu_usage: 0.01
-  actor_gpu_usage: 0.1 # vision
-#  actor_processes: 9
-  actor_processes: 6 # vision
+  gpu_usage: 0.01
+#  gpu_usage: 0.1 # vision
+  actor_gpu_usage: 0.01
+#  actor_gpu_usage: 0.1 # vision
+  actor_processes: 9
+#  actor_processes: 6 # vision
 #  actor_processes:
 #  actor_processes: 1
   write_train_summaries: 500
   save_model_every_cycles: 100
 #  scenario: 'no_obstacles'
 #  scenario: 'simple'
-#  scenario: 'hard'
-  scenario: 'vision'
+  scenario: 'hard'
+#  scenario: 'vision'
+#  scenario: 'vision_harder'
 
 openrave_rl:
   action_step_size: 0.025
@@ -39,20 +40,20 @@ model:
 #  potential_points: [2, 0., 0.075, 3, 0., 0.085, 4, -0.02, 0.05, 4, 0.005, 0.05, 5, 0.005, 0.035, 5, -0.02, 0.035]
   tau: 0.05
 #  tau: 0.01
-#  random_action_probability: 0.02
-  random_action_probability: 0.2
-#  random_noise_std: 0.005
-  random_noise_std: 0.05
-#  use_reward_model: True
-  use_reward_model: False
+  random_action_probability: 0.02
+#  random_action_probability: 0.2
+  random_noise_std: 0.005
+#  random_noise_std: 0.05
+  use_reward_model: True
+#  use_reward_model: False
   alter_episode: 0  # natural reward and original episode
 #  alter_episode: 1  # use learned reward with episode truncation
 #  alter_episode: 2  # use learned reward without episode truncation
   alter_episode_expert: 0  # natural reward and original episode
 #  alter_episode_expert: 1  # use learned reward with episode truncation
 #  alter_episode_expert: 2  # use learned reward without episode truncation
-#  failed_motion_planner_trajectories: 8
-  failed_motion_planner_trajectories: 0
+  failed_motion_planner_trajectories: 8
+#  failed_motion_planner_trajectories: 0
 
 test:
   test_every_cycles: 50
@@ -62,8 +63,8 @@ validation:
   number_of_episodes: 1000
 
 hindsight:
-  enable: False
-#  enable: True
+#  enable: False
+  enable: True
 #  type: 'goal'
   type: 'future'
   k: 4

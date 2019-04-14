@@ -6,8 +6,9 @@ general:
 #  scenario: 'no_obstacles'
 #  scenario: 'simple'
 #  scenario: 'hard'
-  scenario: 'vision'
-  number_of_unzippers: 16
+#  scenario: 'vision'
+  scenario: 'vision_harder'
+  number_of_unzippers: 10
 
 openrave_rl:
   action_step_size: 0.025
@@ -26,14 +27,16 @@ model:
   consider_goal_pose: True
 
 reward:
-#  initial_learn_rate: 0.001
-  initial_learn_rate: 0.01
+  initial_learn_rate: 0.001
+#  initial_learn_rate: 0.01
   decrease_learn_rate_after: 2000
 #  decrease_learn_rate_after: 10000
-  learn_rate_decrease_rate: 0.8
+#  learn_rate_decrease_rate: 0.8
+  learn_rate_decrease_rate: 1.0
   gradient_limit: 5.0
 #  gradient_limit: 0.0
   layers: [100, 100, 100, 100]
+#  layers: [200, 200, 200, 200, 200]
   l2_regularization_coefficient: 0.0001
   cross_entropy_coefficient: 1.0
   activation: 'elu'

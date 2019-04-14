@@ -36,7 +36,7 @@ def run_for_config(config, print_messages):
 
     # where we save all the outputs (outputs will be saved according to the scenario)
     scenario = config['general']['scenario']
-    working_dir = os.path.join(os.getcwd(), scenario)
+    working_dir = os.path.join(get_base_directory(), scenario)
     if not os.path.exists(working_dir):
         os.makedirs(working_dir)
     saver_dir = os.path.join(working_dir, 'models', model_name)
@@ -373,14 +373,16 @@ def run_for_config(config, print_messages):
 def overload_config_by_scenario(config):
     scenario = config['general']['scenario']
     is_vision = _is_vision(scenario)
-    config['general']['trajectory_directory'] = os.path.abspath(os.path.expanduser(
-        os.path.join('~/ModelBasedDDPG/imitation_data/', scenario)))
-    params_file = os.path.abspath(os.path.expanduser(os.path.join('~/ModelBasedDDPG/scenario_params', scenario)))
+    config['general']['trajectory_directory'] = os.path.join(get_base_directory(), 'imitation_data', scenario)
+    params_file = os.path.join(os.getcwd(), 'scenario_params', scenario)
     if not is_vision:
         params_file = os.path.join(params_file, 'params.pkl')
     config['general']['params_file'] = params_file
     config['model']['consider_image'] = is_vision
     config['model']['reward_model_name'] = scenario
+
+def get_base_directory():
+    return os.path.join(os.getcwd(), 'data')
 
 
 if __name__ == '__main__':
@@ -388,7 +390,7 @@ if __name__ == '__main__':
     # os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
     # read the config
-    config_path = os.path.join(os.getcwd(), 'config/config.yml')
+    config_path = os.path.join(get_base_directory(),'config', 'config.yml')
     with open(config_path, 'r') as yml_file:
         config = yaml.load(yml_file)
         overload_config_by_scenario(config)
