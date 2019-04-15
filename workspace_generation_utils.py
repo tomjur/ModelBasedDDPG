@@ -1,4 +1,4 @@
-import Image
+from PIL import Image
 import pickle
 from random import randint, uniform
 import numpy as np

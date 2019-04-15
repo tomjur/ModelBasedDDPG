@@ -186,7 +186,10 @@ RUN bash /scripts/trajopt_deps_install.sh
 
 RUN virtualenv -p python venv2.7 \
  && . venv2.7/bin/activate \
- && pip install h5py numpy scipy "sympy==0.7.1" six matplotlib "tensorflow==1.5" pyyaml Pillow shapely descartes
+ && pip install h5py numpy scipy "sympy==0.7.1" six matplotlib \
+ # ddpgmp dependencies
+ "tensorflow==1.5" pyyaml Pillow shapely descartes
+ # "tensorflow==1.5" "pyyaml==5.1" "Pillow==6.0.0" "shapely==1.6.4.post2" "descartes==1.1.0"
 
 RUN . venv2.7/bin/activate \
  && export MAKEOPTS="-j4" \
