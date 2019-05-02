@@ -24,7 +24,7 @@ class PreTrainedReward:
         if self.is_vision_enabled:
             self.workspace_image_inputs = tf.placeholder(tf.float32, (None, 55, 111), name='workspace_image_inputs')
             self.images_3d = tf.expand_dims(self.workspace_image_inputs, axis=-1)
-        self.goal_pose_inputs = tf.placeholder(tf.float32, (None, 2), name='goal_pose_inputs')
+        self.goal_pose_inputs = None # tf.placeholder(tf.float32, (None, 2), name='goal_pose_inputs')
         self.action_inputs = tf.placeholder(tf.float32, (None, 4), name='action_inputs')
         self.transition_label = tf.placeholder_with_default([[0.0]*3], (None, 3), name='labeled_transition')
         current_variables_count = len(tf.trainable_variables())
@@ -182,7 +182,7 @@ def get_batch_and_labels(batch, openrave_manager, image_cache):
             start_joints, goal_joints, action, next_joints, reward, terminated, status = batch[i]
         else:
             workspace_id, start_joints, goal_joints, action, next_joints, reward, terminated, status = batch[i]
-        goal_pose = openrave_manager.get_target_pose(goal_joints)
+        goal_pose = None #openrave_manager.get_target_pose(goal_joints)
         all_start_joints.append(start_joints[1:])
         all_goal_joints.append(goal_joints[1:])
         all_actions.append(action[1:])
