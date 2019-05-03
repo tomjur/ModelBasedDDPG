@@ -77,8 +77,6 @@ class CollisionNetwork:
             )
         softmax_logits = current
 
-        # TODO: add joints_clipping loss?
-
         self._reuse_flag = True
         return softmax_logits
 

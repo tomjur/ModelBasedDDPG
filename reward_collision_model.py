@@ -9,13 +9,6 @@ import yaml
 import tensorflow as tf
 
 
-class TensorBoard:
-
-    def __init__(self, tensorboard_path, board_name, summaries):
-        self.writer = tf.summary.FileWriter(os.path.join(tensorboard_path, board_name))
-        self.summaries = tf.summary.merge(summaries)
-
-
 class CollisionModel:
 
     def __init__(self, model_name, config, models_base_dir, tensorboard_dir):
@@ -48,8 +41,8 @@ class CollisionModel:
         with open(os.path.join(self.model_dir, 'config.yml'), 'w') as fd:
             yaml.dump(config, fd)
 
-        self.train_board = TensorBoard(tensorboard_dir, 'train_' + model_name, self.train_summaries)
-        self.test_board = TensorBoard(tensorboard_dir, 'test_' + model_name, self.test_summaries)
+        self.train_board = self.TensorBoard(tensorboard_dir, 'train_' + model_name, self.train_summaries)
+        self.test_board = self.TensorBoard(tensorboard_dir, 'test_' + model_name, self.test_summaries)
 
     def predict(self, data_batch, session):
         feed = self.network.make_feed(*data_batch)
@@ -103,22 +96,26 @@ class CollisionModel:
         if gradient_limit > 0.0:
             gradients, _ = tf.clip_by_global_norm(gradients, gradient_limit, use_norm=initial_gradients_norm)
         clipped_gradients_norm = tf.global_norm(gradients)
-        self.train_summaries.append(tf.summary.scalar('Gradients_Norm_Initial', initial_gradients_norm))
-        self.train_summaries.append(tf.summary.scalar('Gradients_Norm_Clipped', clipped_gradients_norm))
+        initial_gradients_norm_summary = tf.summary.scalar('Gradients_Norm_Initial', initial_gradients_norm)
+        clipped_gradients_norm_summary = tf.summary.scalar('Gradients_Norm_Clipped', clipped_gradients_norm)
+        self.train_summaries += [initial_gradients_norm_summary, clipped_gradients_norm_summary]
+        self.test_summaries += [initial_gradients_norm_summary, clipped_gradients_norm_summary]
 
         return optimizer.apply_gradients(zip(gradients, variables), global_step=self.global_step_var)
 
-    def _train_batch(self, data_batch, status_batch, session):
-        train_feed = self.network.make_feed(*data_batch)
-        train_feed[self.status_input] = np.array(status_batch)
+    def _train_batch(self, train_batch, train_status_batch, session):
+        batch_start_joints, batch_actions, batch_images = train_batch
+        train_feed = self.network.make_feed(batch_start_joints, batch_actions, batch_images)
+        train_feed[self.status_input] = np.array(train_status_batch)
         train_summary, self.global_step, _ = session.run(
             [self.train_board.summaries, self.global_step_var, self.optimizer],
             train_feed)
         self.train_board.writer.add_summary(train_summary, self.global_step)
 
-    def _test_batch(self, test_batch, status_batch, session):
-        test_feed = self.network.make_feed(*test_batch)
-        test_feed[self.status_input] = np.array(status_batch)
+    def _test_batch(self, test_batch, test_status_batch, session):
+        batch_start_joints, batch_actions, batch_images = test_batch
+        test_feed = self.network.make_feed(batch_start_joints, batch_actions, batch_images)
+        test_feed[self.status_input] = np.array(test_status_batch)
         test_summary = session.run(
             [self.test_board.summaries] + self.test_measures,
             test_feed)[0]
@@ -146,6 +143,12 @@ class CollisionModel:
                 self.network.saver.save(session, self.model_dir, global_step=self.global_step)
 
             print('done epoch {} of {}, global step {}'.format(epoch, self.epochs, self.global_step))
+
+    class TensorBoard:
+
+        def __init__(self, tensorboard_path, board_name, summaries):
+            self.writer = tf.summary.FileWriter(os.path.join(tensorboard_path, board_name))
+            self.summaries = tf.summary.merge(summaries)
 
 
 if __name__ == '__main__':
