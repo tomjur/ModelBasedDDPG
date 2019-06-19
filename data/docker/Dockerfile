@@ -188,8 +188,15 @@ RUN virtualenv -p python venv2.7 \
  && . venv2.7/bin/activate \
  && pip install h5py numpy scipy "sympy==0.7.1" six matplotlib \
  # ddpgmp dependencies
- "tensorflow==1.5" pyyaml Pillow shapely descartes
+ pyyaml Pillow shapely descartes
+# "tensorflow_gpu==1.5" pyyaml Pillow shapely descartes
  # "tensorflow==1.5" "pyyaml==5.1" "Pillow==6.0.0" "shapely==1.6.4.post2" "descartes==1.1.0"
+
+# Install TensorFlow GPU version.
+RUN virtualenv -p python venv2.7 \
+ && . venv2.7/bin/activate \
+ && pip --no-cache-dir install \
+  http://storage.googleapis.com/tensorflow/linux/gpu/tensorflow_gpu-1.5.0-cp27-none-linux_x86_64.whl
 
 RUN . venv2.7/bin/activate \
  && export MAKEOPTS="-j4" \
