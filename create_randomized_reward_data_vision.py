@@ -4,8 +4,12 @@ import random
 import cPickle as pickle
 
 
-source_dir = os.path.expanduser('~/ModelBasedDDPG/supervised_data/vision/test')
-new_dir = os.path.expanduser('~/ModelBasedDDPG/supervised_data/vision_shuffled/test')
+# source_dir = os.path.expanduser('~/ModelBasedDDPG/supervised_data/vision/test')
+# source_dir = os.path.expanduser('~/ModelBasedDDPG/supervised_data/vision_harder_by_workspace/test')
+source_dir = os.path.expanduser('~/ModelBasedDDPG/supervised_data/vision_harder_by_workspace/train')
+# new_dir = os.path.expanduser('~/ModelBasedDDPG/supervised_data/vision_shuffled/test')
+# new_dir = os.path.expanduser('~/ModelBasedDDPG/supervised_data/vision_harder_shuffled/test')
+new_dir = os.path.expanduser('~/ModelBasedDDPG/supervised_data/vision_harder_shuffled/train')
 samples_per_new_file = 1000
 
 if not os.path.exists(new_dir):
@@ -41,10 +45,9 @@ for dirpath, dirnames, filenames in os.walk(source_dir):
         if not filename.endswith('.pkl'):
             continue
         name_parts = filename.split('_')
-        workspace_id = '{}_{}.pkl'.format(name_parts[0], name_parts[1])
-        compressed_file = bz2.BZ2File(os.path.join(source_dir, filename), 'r')
-        new_data = pickle.load(compressed_file)
-        compressed_file.close()
+        workspace_id = '{}_{}'.format(name_parts[0], name_parts[1])
+        with bz2.BZ2File(os.path.join(source_dir, filename), 'r') as compressed_file:
+            new_data = pickle.load(compressed_file)
         new_data = [tuple([workspace_id] + list(t))for t in new_data]
         data.extend(new_data)
         current_data_len = len(new_data)
