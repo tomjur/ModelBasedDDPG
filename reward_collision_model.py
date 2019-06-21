@@ -1,6 +1,6 @@
 from reward_collision_network import CollisionNetwork
-from reward_data_manager import get_batch_and_labels
-from reward_data_manager import get_train_and_test_datasets, get_image_cache
+import reward_data_manager
+from reward_data_manager import get_train_and_test_datasets, get_batch_and_labels, get_image_cache
 import time
 import datetime
 import numpy as np
@@ -123,7 +123,6 @@ class CollisionModel:
         test_summary = session.run(
             [self.test_board.summaries] + self.test_measures,
             test_feed)[0]
-        print(session.run([self.list], test_feed))
         self.test_board.writer.add_summary(test_summary, self.global_step)
         self.test_board.writer.flush()
 
@@ -136,12 +135,14 @@ class CollisionModel:
 
             train_batch_count = 1
             for train_batch in train_data:
+
                 train_batch, train_status_batch = get_batch_and_labels(train_batch, image_cache)
-                # TODO: assert if train_status contains goal status
+                # assert if train_status contains goal status
+                assert(np.all(np.array(train_status_batch) != reward_data_manager.GOAL_STATUS))
+
                 self._train_batch(train_batch, train_status_batch, session)
                 print("Finished epoch %d/%d batch %d/%d" % (epoch+1, self.epochs, train_batch_count, total_train_batches))
                 train_batch_count += 1
-
             total_train_batches = train_batch_count
             self.train_board.writer.flush()
 

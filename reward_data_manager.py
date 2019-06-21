@@ -8,6 +8,10 @@ import pickle
 import bz2
 from image_cache import ImageCache
 
+FREE_TRANSITION_STATUS = 1
+COLLISION_STATUS = 2
+GOAL_STATUS = 3
+
 
 class UnzipperProcess(multiprocessing.Process):
     def __init__(self, number_of_unzippers, files_queue, result_queue, unzipper_specific_queue):
