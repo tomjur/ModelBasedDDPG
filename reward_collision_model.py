@@ -29,7 +29,7 @@ class CollisionModel:
         self.network = CollisionNetwork(config, self.model_dir)
         self.net_output = self.network.status_softmax_logits
         self.status_input = tf.placeholder(tf.int32, [None, ])
-        self.prediction = tf.argmax(tf.nn.softmax(self.net_output), axis=1)
+        self.prediction = tf.argmax(tf.nn.softmax(self.net_output), axis=1, output_type=tf.int32)
 
         self.global_step = 0
         self.global_step_var = tf.Variable(0, trainable=False)
@@ -67,14 +67,18 @@ class CollisionModel:
 
     def add_test_measures(self):
         labels = self.status_input - 1
-        accuracy, accuracy_op = tf.metrics.accuracy(labels=labels, predictions=self.prediction)
-        precision, precision_op = tf.metrics.precision(labels=labels, predictions=self.prediction)
-        recall, recall_op = tf.metrics.recall(labels=labels, predictions=self.prediction)
+        accuracy = tf.reduce_mean(tf.cast(tf.equal(labels, self.prediction), tf.float32))
+        TP = tf.count_nonzero((self.prediction) * (labels), dtype=tf.float32) + tf.Variable(0.001)
+        TN = tf.count_nonzero((self.prediction - 1) * (labels - 1), dtype=tf.float32) + tf.Variable(0.001)
+        FP = tf.count_nonzero(self.prediction * (labels - 1), dtype=tf.float32) + tf.Variable(0.001)
+        FN = tf.count_nonzero((self.prediction - 1) * labels, dtype=tf.float32) + tf.Variable(0.001)
+        precision = TP / (TP + FP)
+        recall = TP / (TP + FN)
         accuracy_summary = tf.summary.scalar('Accuracy', accuracy)
         recall_summary = tf.summary.scalar('Recall', recall)
         precision_summary = tf.summary.scalar('Precision', precision)
         self.test_summaries += [accuracy_summary, recall_summary, precision_summary]
-        return [accuracy, accuracy_op, recall, recall_op, precision, precision_op]
+        return [accuracy, recall, precision]
 
     def init_optimizer(self):
         initial_learn_rate = self.config['reward']['initial_learn_rate']
@@ -119,6 +123,7 @@ class CollisionModel:
         test_summary = session.run(
             [self.test_board.summaries] + self.test_measures,
             test_feed)[0]
+        print(session.run([self.list], test_feed))
         self.test_board.writer.add_summary(test_summary, self.global_step)
         self.test_board.writer.flush()
 
@@ -126,12 +131,18 @@ class CollisionModel:
         session.run(tf.global_variables_initializer())
         session.run(tf.local_variables_initializer())
 
+        total_train_batches = 0
         for epoch in range(self.epochs):
 
+            train_batch_count = 1
             for train_batch in train_data:
                 train_batch, train_status_batch = get_batch_and_labels(train_batch, image_cache)
                 # TODO: assert if train_status contains goal status
                 self._train_batch(train_batch, train_status_batch, session)
+                print("Finished epoch %d/%d batch %d/%d" % (epoch+1, self.epochs, train_batch_count, total_train_batches))
+                train_batch_count += 1
+
+            total_train_batches = train_batch_count
             self.train_board.writer.flush()
 
             test_batch = next(test_data.__iter__()) # random test batch
