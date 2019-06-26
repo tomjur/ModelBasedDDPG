@@ -50,7 +50,6 @@ class CollisionNetwork:
     def _create_network(self, joints_inputs, action_inputs, images_3d):
         name_prefix = 'reward'
 
-
         # get L2 regularization scale
         l2_scale = 0.0
         if 'l2_regularization_coefficient' in self.config['reward']:
@@ -62,6 +61,14 @@ class CollisionNetwork:
 
         # add vision if needed
         if self.is_vision_enabled:
+            batch_size = tf.shape(images_3d)[0]
+            rows_vec = tf.constant(range(55), dtype=tf.float32)
+            cols_vec = tf.constant(range(111), dtype=tf.float32)
+            rows_idx = tf.reshape(tf.transpose(tf.ones([111, 1]) * rows_vec), [1, 55, 111, 1]) / 54
+            cols_idx = tf.reshape(tf.ones([1, 55, 1]) * cols_vec, [1, 55, 111, 1]) / 110
+            cols_idx = tf.tile(cols_idx, tf.stack([batch_size, 1, 1, 1]))
+            rows_idx = tf.tile(rows_idx, tf.stack([batch_size, 1, 1, 1]))
+            images_3d = tf.concat((images_3d, rows_idx, cols_idx), axis=3)
             visual_inputs = DqnModel(name_prefix).predict(images_3d, self._reuse_flag)
             current = tf.concat((current, visual_inputs), axis=1)
 
