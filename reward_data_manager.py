@@ -204,10 +204,13 @@ def get_image_cache(config):
     return image_cache
 
 
-def get_train_and_test_datasets(config):
+def get_train_and_test_datasets(config, is_collision_model=False):
     number_of_unzippers = config['general']['number_of_unzippers']
     batch_size = config['model']['batch_size']
-    oversample_goal = config['reward']['oversample_goal']
+    if is_collision_model:
+        oversample_goal = 0
+    else:
+        oversample_goal = config['reward']['oversample_goal']
     oversample_collision = config['reward']['oversample_collision']
     scenario = config['general']['scenario']
     base_data_dir = os.path.join('data', 'supervised_data', scenario + '_by_status')
@@ -226,6 +229,8 @@ def get_batch_and_labels(batch, image_cache):
     all_start_joints = []
     all_actions = []
     all_status = []
+    all_next_joints = []
+    all_goal_joints = []
     all_images = None
     if image_cache is not None:
         all_images = []
@@ -237,8 +242,10 @@ def get_batch_and_labels(batch, image_cache):
             workspace_id, start_joints, goal_joints, action, next_joints, reward, terminated, status = batch[i]
         all_start_joints.append(start_joints[1:])
         all_actions.append(action[1:])
+        all_next_joints.append(next_joints[1:])
+        all_goal_joints.append(goal_joints[1:])
         all_status.append(status)
         if image_cache is not None:
             image = image_cache.items[workspace_id].np_array
             all_images.append(image)
-    return [all_start_joints, all_actions, all_images], all_status
+    return [all_start_joints, all_actions, all_images, all_next_joints, all_goal_joints], all_status

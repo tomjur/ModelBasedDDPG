@@ -1,14 +1,14 @@
 general:
-  epochs: 5000
+  epochs: 20
   save_every_epochs: 1
 #  gpu_usage: 0.1
   gpu_usage: 0.8  # with vision
 #  scenario: 'no_obstacles'
-#  scenario: 'simple'
+  scenario: 'simple'
 #  scenario: 'hard'
 #  scenario: 'vision'
-  scenario: 'vision_harder'
-  number_of_unzippers: 10
+#  scenario: 'vision_harder'
+  number_of_unzippers: 1
 
 openrave_rl:
   action_step_size: 0.025
@@ -32,13 +32,13 @@ reward:
   decrease_learn_rate_after: 2000
 #  decrease_learn_rate_after: 10000
 #  learn_rate_decrease_rate: 0.8
-  learn_rate_decrease_rate: 1.0
+  learn_rate_decrease_rate: 0.5
   gradient_limit: 5.0
 #  gradient_limit: 0.0
-  layers: [100, 100, 100, 100]
+  layers: [300, 300, 300, 200, 100, 100]
 #  layers: [200, 200, 200, 200, 200]
   l2_regularization_coefficient: 0.0001
   cross_entropy_coefficient: 1.0
   activation: 'elu'
-  oversample_goal: 1.0
-  oversample_collision: 1.0
+  oversample_goal: 0.2
+  oversample_collision: 0.38

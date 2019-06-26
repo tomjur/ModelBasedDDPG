@@ -29,6 +29,8 @@ class CollisionModel:
         self.network = CollisionNetwork(config, self.model_dir)
         self.net_output = self.network.status_softmax_logits
         self.status_input = tf.placeholder(tf.int32, [None, ])
+        # TODO: fix collision_prob
+        self.collision_prob = tf.expand_dims(tf.nn.softmax(self.net_output)[:, 1], -1)
         self.prediction = tf.argmax(tf.nn.softmax(self.net_output), axis=1, output_type=tf.int32)
 
         self.global_step = 0
@@ -44,12 +46,18 @@ class CollisionModel:
         self.train_board = self.TensorBoard(tensorboard_dir, 'train_' + model_name, self.train_summaries)
         self.test_board = self.TensorBoard(tensorboard_dir, 'test_' + model_name, self.test_summaries)
 
+    def load(self, session):
+        self.network.load_weights(session)
+
+    def make_feed(self, data_batch):
+        return self.network.make_feed(*data_batch)
+
     def predict(self, data_batch, session):
-        feed = self.network.make_feed(*data_batch)
+        feed = self.make_feed(data_batch)
         return session.run([self.prediction], feed)[0]
 
     def init_loss(self):
-        status_loss_scale = config['reward']['cross_entropy_coefficient']
+        status_loss_scale = self.config['reward']['cross_entropy_coefficient']
         status_loss = status_loss_scale * \
                            tf.losses.sparse_softmax_cross_entropy(labels=self.status_input - 1, logits=self.net_output)
         status_loss_summary = tf.summary.scalar('Status_Loss', status_loss)
@@ -96,7 +104,7 @@ class CollisionModel:
 
         gradients, variables = zip(*optimizer.compute_gradients(self.loss, tf.trainable_variables()))
         initial_gradients_norm = tf.global_norm(gradients)
-        gradient_limit = config['reward']['gradient_limit']
+        gradient_limit = self.config['reward']['gradient_limit']
         if gradient_limit > 0.0:
             gradients, _ = tf.clip_by_global_norm(gradients, gradient_limit, use_norm=initial_gradients_norm)
         clipped_gradients_norm = tf.global_norm(gradients)
@@ -108,7 +116,7 @@ class CollisionModel:
         return optimizer.apply_gradients(zip(gradients, variables), global_step=self.global_step_var)
 
     def _train_batch(self, train_batch, train_status_batch, session):
-        batch_start_joints, batch_actions, batch_images = train_batch
+        batch_start_joints, batch_actions, batch_images, _, _ = train_batch
         train_feed = self.network.make_feed(batch_start_joints, batch_actions, batch_images)
         train_feed[self.status_input] = np.array(train_status_batch)
         train_summary, self.global_step, _ = session.run(
@@ -117,7 +125,7 @@ class CollisionModel:
         self.train_board.writer.add_summary(train_summary, self.global_step)
 
     def _test_batch(self, test_batch, test_status_batch, session):
-        batch_start_joints, batch_actions, batch_images = test_batch
+        batch_start_joints, batch_actions, batch_images, _, _ = test_batch
         test_feed = self.network.make_feed(batch_start_joints, batch_actions, batch_images)
         test_feed[self.status_input] = np.array(test_status_batch)
         test_summary = session.run(
@@ -143,7 +151,7 @@ class CollisionModel:
                 self._train_batch(train_batch, train_status_batch, session)
                 print("Finished epoch %d/%d batch %d/%d" % (epoch+1, self.epochs, train_batch_count, total_train_batches))
                 train_batch_count += 1
-            total_train_batches = train_batch_count
+            total_train_batches = train_batch_count - 1
             self.train_board.writer.flush()
 
             test_batch = next(test_data.__iter__()) # random test batch
@@ -152,7 +160,7 @@ class CollisionModel:
 
             # save the model
             if epoch == self.epochs - 1 or epoch % self.save_every_epochs == self.save_every_epochs - 1:
-                self.network.saver.save(session, self.model_dir, global_step=self.global_step)
+                self.network.save_weights(session, self.global_step)
 
             print('done epoch {} of {}, global step {}'.format(epoch, self.epochs, self.global_step))
 
@@ -172,10 +180,11 @@ if __name__ == '__main__':
         print(yaml.dump(config))
 
     model_name = datetime.datetime.fromtimestamp(time.time()).strftime('%Y_%m_%d_%H_%M_%S')
+    collision_model_name = "collision_simple_trained"
     models_base_dir = os.path.join('data', 'reward', 'model')
     collision_model = CollisionModel(model_name, config, models_base_dir, tensorboard_dir=models_base_dir)
 
-    train_data, test_data = get_train_and_test_datasets(config)
+    train_data, test_data = get_train_and_test_datasets(config, is_collision_model=True)
     image_cache = get_image_cache(config)
 
     gpu_usage = config['general']['gpu_usage']

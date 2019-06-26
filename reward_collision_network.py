@@ -23,12 +23,13 @@ class CollisionNetwork:
 
         current_variables_count = len(tf.trainable_variables())
         self.status_softmax_logits = self._create_network(self.joints_inputs, self.action_inputs, self.images_3d)
-        collision_variables = tf.trainable_variables()[current_variables_count:]
+        self.collision_variables = tf.trainable_variables()[current_variables_count:]
 
         # model path to load
         self.model_dir = model_dir
         assert os.path.exists(self.model_dir)
-        self.saver = tf.train.Saver(collision_variables, max_to_keep=4, save_relative_paths=self.model_dir)
+        self.saver_path = os.path.join(self.model_dir, "model_saver")
+        self.saver = tf.train.Saver(self.collision_variables, max_to_keep=4, save_relative_paths=True)
 
     def _next_state_model(self, joints_inputs, action_inputs):
         # next step is a deterministic computation
@@ -79,6 +80,9 @@ class CollisionNetwork:
 
         self._reuse_flag = True
         return softmax_logits
+
+    def save_weights(self, sess, global_step=None):
+        self.saver.save(sess, self.saver_path, global_step=global_step)
 
     def load_weights(self, sess):
         self.saver.restore(sess, tf.train.latest_checkpoint(self.model_dir))
