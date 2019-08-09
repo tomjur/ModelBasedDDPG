@@ -4,10 +4,10 @@ general:
 #  gpu_usage: 0.1
   gpu_usage: 0.8  # with vision
 #  scenario: 'no_obstacles'
-  scenario: 'simple'
+#  scenario: 'simple'
 #  scenario: 'hard'
 #  scenario: 'vision'
-#  scenario: 'vision_harder'
+  scenario: 'vision_harder'
   number_of_unzippers: 1
 
 openrave_rl:

@@ -94,7 +94,7 @@ class CollisionModel:
         learn_rate_decrease_rate = self.config['reward']['learn_rate_decrease_rate']
 
         learning_rate = tf.train.exponential_decay(initial_learn_rate,
-                                                   self.global_step,
+                                                   self.global_step_var,
                                                    decrease_learn_rate_after,
                                                    learn_rate_decrease_rate,
                                                    staircase=True)
