@@ -29,10 +29,10 @@ model:
 reward:
   initial_learn_rate: 0.001
 #  initial_learn_rate: 0.01
-  decrease_learn_rate_after: 2000
+  decrease_learn_rate_after: 300
 #  decrease_learn_rate_after: 10000
 #  learn_rate_decrease_rate: 0.8
-  learn_rate_decrease_rate: 0.5
+  learn_rate_decrease_rate: 0.8
   gradient_limit: 5.0
 #  gradient_limit: 0.0
   layers: [300, 300, 300, 200, 100, 100]
@@ -42,3 +42,4 @@ reward:
   activation: 'elu'
   oversample_goal: 0.2
   oversample_collision: 0.38
+  use_coordnet: true

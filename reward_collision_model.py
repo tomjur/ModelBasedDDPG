@@ -86,6 +86,7 @@ class CollisionModel:
         recall_summary = tf.summary.scalar('Recall', recall)
         precision_summary = tf.summary.scalar('Precision', precision)
         self.test_summaries += [accuracy_summary, recall_summary, precision_summary]
+        self.train_summaries += [accuracy_summary, recall_summary, precision_summary]
         return [accuracy, recall, precision]
 
     def init_optimizer(self):
@@ -119,8 +120,8 @@ class CollisionModel:
         batch_start_joints, batch_actions, batch_images, _, _ = train_batch
         train_feed = self.network.make_feed(batch_start_joints, batch_actions, batch_images)
         train_feed[self.status_input] = np.array(train_status_batch)
-        train_summary, self.global_step, _ = session.run(
-            [self.train_board.summaries, self.global_step_var, self.optimizer],
+        train_summary, self.global_step, _, _ = session.run(
+            [self.train_board.summaries, self.global_step_var, self.optimizer, self.test_measures],
             train_feed)
         self.train_board.writer.add_summary(train_summary, self.global_step)
 

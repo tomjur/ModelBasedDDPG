@@ -61,7 +61,7 @@ class CollisionNetwork:
 
         # add vision if needed
         if self.is_vision_enabled:
-            visual_inputs = DqnModel(name_prefix).predict(images_3d, self._reuse_flag)
+            visual_inputs = DqnModel(name_prefix, self.config).predict(images_3d, self._reuse_flag)
             current = tf.concat((current, visual_inputs), axis=1)
 
         layers = self.config['reward']['layers'] + [2]
