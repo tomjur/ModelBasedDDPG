@@ -3,6 +3,7 @@ import tensorflow as tf
 import tensorflow.contrib.layers as tf_layers
 from dqn_model import DqnModel
 from modeling_utils import get_activation
+from resnet_model import ResNetModel
 
 
 class CollisionNetwork:
@@ -12,6 +13,8 @@ class CollisionNetwork:
 
         self.config = config
         self.is_vision_enabled = 'vision' in config['general']['scenario']
+        self.image_network = config['reward']['image_network']
+        assert('dqn' == self.image_network or 'resnet' == self.image_network)
 
         self.joints_inputs = tf.placeholder(tf.float32, (None, 4), name='joints_inputs')
         self.action_inputs = tf.placeholder(tf.float32, (None, 4), name='action_inputs')
@@ -61,7 +64,13 @@ class CollisionNetwork:
 
         # add vision if needed
         if self.is_vision_enabled:
-            visual_inputs = DqnModel(name_prefix, self.config).predict(images_3d, self._reuse_flag)
+            if self.image_network == 'dqn':
+                visual_inputs = DqnModel(name_prefix, self.config).predict(images_3d, self._reuse_flag)
+            else:
+                num_of_residual_blocks = self.config['reward']['resnet_num_of_residual_blocks']
+                visual_inputs = ResNetModel(name_prefix, self.config).predict(images_3d,
+                                                                              num_of_residual_blocks,
+                                                                              self._reuse_flag)
             current = tf.concat((current, visual_inputs), axis=1)
 
         layers = self.config['reward']['layers'] + [2]

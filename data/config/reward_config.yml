@@ -43,3 +43,5 @@ reward:
   oversample_goal: 0.2
   oversample_collision: 0.38
   use_coordnet: true
+  image_network: 'resnet'
+  resnet_num_of_residual_blocks: 2
