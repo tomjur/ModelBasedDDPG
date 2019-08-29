@@ -139,6 +139,8 @@ class CollisionModel:
         session.run(tf.global_variables_initializer())
         session.run(tf.local_variables_initializer())
 
+        test_every_batches = self.config['reward']['test_every_batches']
+
         total_train_batches = 0
         for epoch in range(self.epochs):
 
@@ -152,6 +154,14 @@ class CollisionModel:
                 self._train_batch(train_batch, train_status_batch, session)
                 print("Finished epoch %d/%d batch %d/%d" % (epoch+1, self.epochs, train_batch_count, total_train_batches))
                 train_batch_count += 1
+
+                if train_batch_count % test_every_batches == 0:
+                    test_batch = next(test_data.__iter__())  # random test batch
+                    test_batch, test_status_batch = get_batch_and_labels(test_batch, image_cache)
+                    self._test_batch(test_batch, test_status_batch, session)
+                    # save the model
+                    self.network.save_weights(session, self.global_step)
+
             total_train_batches = train_batch_count - 1
             self.train_board.writer.flush()
 

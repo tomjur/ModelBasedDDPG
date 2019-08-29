@@ -22,17 +22,17 @@ openrave_rl:
 
 model:
 #  batch_size: 10240
-  batch_size: 2000  # with vision
+  batch_size: 400  # with vision
   potential_points: [2, 0., 0.075, 3, 0., 0.085, 4, -0.02, 0.05, 4, 0.005, 0.05, 5, 0.005, 0.035, 5, -0.02, 0.035]
   consider_goal_pose: True
 
 reward:
   initial_learn_rate: 0.001
 #  initial_learn_rate: 0.01
-  decrease_learn_rate_after: 300
+  decrease_learn_rate_after: 10000
 #  decrease_learn_rate_after: 10000
 #  learn_rate_decrease_rate: 0.8
-  learn_rate_decrease_rate: 0.8
+  learn_rate_decrease_rate: 0.9
   gradient_limit: 5.0
 #  gradient_limit: 0.0
   layers: [300, 300, 300, 200, 100, 100]
@@ -44,4 +44,5 @@ reward:
   oversample_collision: 0.38
   use_coordnet: true
   image_network: 'resnet'
-  resnet_num_of_residual_blocks: 2
+  resnet_num_of_residual_blocks: 4
+  test_every_batches: 1000
