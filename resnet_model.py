@@ -79,13 +79,16 @@ class ResNetModel:
         '''
 
         out_channel = filter_shape[-1]
-        filter = self.create_variables(name='conv', shape=filter_shape)
 
         if self.config['reward']['use_coordnet']:
             print("Using Coordnet")
             conv_layer = coord_conv(55, 111, False, input_layer, filter_shape[-1], filter_shape[0:2], stride, padding='same',
                                     use_bias=True, name='{}_conv1'.format(self.prefix))
         else:
+            # set num of channels to 1
+            filter_shape[2] = 1
+
+            filter = self.create_variables(name='conv', shape=filter_shape)
             conv_layer = tf.nn.conv2d(input_layer, filter, strides=[1, stride, stride, 1], padding='SAME')
         bn_layer = self.batch_normalization_layer(conv_layer, out_channel)
 
