@@ -27,22 +27,22 @@ model:
   consider_goal_pose: True
 
 reward:
-  initial_learn_rate: 0.001
-#  initial_learn_rate: 0.01
-  decrease_learn_rate_after: 10000
-#  decrease_learn_rate_after: 10000
-#  learn_rate_decrease_rate: 0.8
-  learn_rate_decrease_rate: 0.9
-  gradient_limit: 5.0
-#  gradient_limit: 0.0
-  layers: [300, 300, 300, 200, 100, 100]
-#  layers: [200, 200, 200, 200, 200]
-  l2_regularization_coefficient: 0.0001
-  cross_entropy_coefficient: 1.0
-  activation: 'elu'
-  oversample_goal: 0.2
-  oversample_collision: 0.38
-  use_coordnet: true
-  image_network: 'resnet'
-  resnet_num_of_residual_blocks: 4
-  test_every_batches: 1000
+  train:
+    initial_learn_rate: 0.001
+    decrease_learn_rate_after: 10000
+    learn_rate_decrease_rate: 0.9
+    gradient_limit: 5.0
+    l2_regularization_coefficient: 0.0001
+    cross_entropy_coefficient: 1.0
+    oversample_goal: 0.2
+    oversample_collision: 0.38
+  network:
+    layers: [300, 300, 300, 200, 100, 100]
+    activation: 'elu'
+    use_coordnet: false
+    image_network: 'dqn'
+    train_vae: true
+    vae_latent_dim: 150
+    resnet_num_of_residual_blocks: 4
+    test_every_batches: 1000
+

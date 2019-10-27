@@ -1,16 +1,14 @@
-from reward_collision_network import CollisionNetwork
-import reward_data_manager
-from reward_data_manager import get_train_and_test_datasets, get_batch_and_labels, get_image_cache
+from reward_data_manager import get_image_cache
 import time
 import datetime
 import numpy as np
 import os
 import yaml
 import tensorflow as tf
-from dqn_model import DqnModel
+from vae_network import VAENetwork
 
 
-class CollisionModel:
+class VAEModel:
 
     def __init__(self, model_name, config, models_base_dir, tensorboard_dir):
 
@@ -28,18 +26,13 @@ class CollisionModel:
         self.save_every_epochs = config['general']['save_every_epochs']
         self.train_vae = config['reward']['train_vae']
 
-        self.network = CollisionNetwork(config, self.model_dir)
-        self.net_output = self.network.status_softmax_logits
-        self.status_input = tf.placeholder(tf.int32, [None, ])
-        # TODO: fix collision_prob
-        self.collision_prob = tf.expand_dims(tf.nn.softmax(self.net_output)[:, 1], -1)
-        self.prediction = tf.argmax(tf.nn.softmax(self.net_output), axis=1, output_type=tf.int32)
+        inputs_example = tf.placeholder(tf.float32, (None, 55, 111), name='example')
+        self.network = VAENetwork(config, self.model_dir, inputs_example.shape)
 
         self.global_step = 0
         self.global_step_var = tf.Variable(0, trainable=False)
 
         self.loss = self.init_loss()
-        self.test_measures = self.add_test_measures()
         self.optimizer = self.init_optimizer()
 
         with open(os.path.join(self.model_dir, 'config.yml'), 'w') as fd:
@@ -60,36 +53,21 @@ class CollisionModel:
 
     def init_loss(self):
         status_loss_scale = self.config['reward']['cross_entropy_coefficient']
-        status_loss = status_loss_scale * \
-                           tf.losses.sparse_softmax_cross_entropy(labels=self.status_input - 1, logits=self.net_output)
-        status_loss_summary = tf.summary.scalar('Status_Loss', status_loss)
+        img_loss, latent_loss, total_loss = self.network.get_loss()
+
+        image_loss_summary = tf.summary.scalar('Image_Loss', img_loss)
+        latent_loss_summary = tf.summary.scalar('Latent_Loss', latent_loss)
 
         regularization_loss = tf.losses.get_regularization_loss()
         regularization_loss_summary = tf.summary.scalar('Regularization_Loss', regularization_loss)
 
-        total_loss = status_loss + regularization_loss
+        # total_loss = total_loss + regularization_loss
         total_loss_summary = tf.summary.scalar('Total_Loss', total_loss)
 
-        self.train_summaries += [status_loss_summary, regularization_loss_summary, total_loss_summary]
-        self.test_summaries += [status_loss_summary, regularization_loss_summary, total_loss_summary]
+        self.train_summaries += [image_loss_summary, latent_loss_summary, regularization_loss_summary, total_loss_summary]
+        self.test_summaries += [image_loss_summary, latent_loss_summary, regularization_loss_summary, total_loss_summary]
 
         return total_loss
-
-    def add_test_measures(self):
-        labels = self.status_input - 1
-        accuracy = tf.reduce_mean(tf.cast(tf.equal(labels, self.prediction), tf.float32))
-        TP = tf.count_nonzero((self.prediction) * (labels), dtype=tf.float32) + tf.Variable(0.001)
-        TN = tf.count_nonzero((self.prediction - 1) * (labels - 1), dtype=tf.float32) + tf.Variable(0.001)
-        FP = tf.count_nonzero(self.prediction * (labels - 1), dtype=tf.float32) + tf.Variable(0.001)
-        FN = tf.count_nonzero((self.prediction - 1) * labels, dtype=tf.float32) + tf.Variable(0.001)
-        precision = TP / (TP + FP)
-        recall = TP / (TP + FN)
-        accuracy_summary = tf.summary.scalar('Accuracy', accuracy)
-        recall_summary = tf.summary.scalar('Recall', recall)
-        precision_summary = tf.summary.scalar('Precision', precision)
-        self.test_summaries += [accuracy_summary, recall_summary, precision_summary]
-        self.train_summaries += [accuracy_summary, recall_summary, precision_summary]
-        return [accuracy, recall, precision]
 
     def init_optimizer(self):
         initial_learn_rate = self.config['reward']['initial_learn_rate']
@@ -118,26 +96,23 @@ class CollisionModel:
 
         return optimizer.apply_gradients(zip(gradients, variables), global_step=self.global_step_var)
 
-    def _train_batch(self, train_batch, train_status_batch, session):
-        batch_start_joints, batch_actions, batch_images, _, _ = train_batch
-        train_feed = self.network.make_feed(batch_start_joints, batch_actions, batch_images)
-        train_feed[self.status_input] = np.array(train_status_batch)
-        train_summary, self.global_step, _, _ = session.run(
-            [self.train_board.summaries, self.global_step_var, self.optimizer, self.test_measures],
+    def _train_batch(self, train_batch, session):
+        train_feed = {self.network.workspace_image_inputs: train_batch}
+        train_summary, self.global_step, img_loss, _ = session.run(
+            [self.train_board.summaries, self.global_step_var, self.network.encoded, self.optimizer],
             train_feed)
+        # print(img_loss)
         self.train_board.writer.add_summary(train_summary, self.global_step)
 
-    def _test_batch(self, test_batch, test_status_batch, session):
-        batch_start_joints, batch_actions, batch_images, _, _ = test_batch
-        test_feed = self.network.make_feed(batch_start_joints, batch_actions, batch_images)
-        test_feed[self.status_input] = np.array(test_status_batch)
+    def _test_batch(self, test_batch, session):
+        test_feed = {self.network.workspace_image_inputs: test_batch}
         test_summary = session.run(
-            [self.test_board.summaries] + self.test_measures,
+            [self.test_board.summaries],
             test_feed)[0]
         self.test_board.writer.add_summary(test_summary, self.global_step)
         self.test_board.writer.flush()
 
-    def train(self, train_data, test_data, image_cache, session):
+    def train(self, train_data, test_data, session):
         session.run(tf.global_variables_initializer())
         session.run(tf.local_variables_initializer())
 
@@ -148,32 +123,25 @@ class CollisionModel:
 
             train_batch_count = 1
             for train_batch in train_data:
-
-                train_batch, train_status_batch = get_batch_and_labels(train_batch, image_cache)
-                # assert if train_status contains goal status
-                assert(np.all(np.array(train_status_batch) != reward_data_manager.GOAL_STATUS))
-
-                self._train_batch(train_batch, train_status_batch, session)
+                self._train_batch(train_batch, session)
                 print("Finished epoch %d/%d batch %d/%d" % (epoch+1, self.epochs, train_batch_count, total_train_batches))
                 train_batch_count += 1
 
                 if train_batch_count % test_every_batches == 0:
                     test_batch = next(test_data.__iter__())  # random test batch
-                    test_batch, test_status_batch = get_batch_and_labels(test_batch, image_cache)
-                    self._test_batch(test_batch, test_status_batch, session)
+                    self._test_batch(test_batch, session)
                     # save the model
-                    self.network.save_weights(session, self.global_step)
+                    # self.network.save_weights(session, self.global_step)
 
             total_train_batches = train_batch_count - 1
             self.train_board.writer.flush()
 
             test_batch = next(test_data.__iter__()) # random test batch
-            test_batch, test_status_batch = get_batch_and_labels(test_batch, image_cache)
-            self._test_batch(test_batch, test_status_batch, session)
+            self._test_batch(test_batch, session)
 
             # save the model
-            if epoch == self.epochs - 1 or epoch % self.save_every_epochs == self.save_every_epochs - 1:
-                self.network.save_weights(session, self.global_step)
+            # if epoch == self.epochs - 1 or epoch % self.save_every_epochs == self.save_every_epochs - 1:
+            #     self.network.save_weights(session, self.global_step)
 
             print('done epoch {} of {}, global step {}'.format(epoch, self.epochs, self.global_step))
 
@@ -184,6 +152,17 @@ class CollisionModel:
             self.summaries = tf.summary.merge(summaries)
 
 
+def count_weights():
+    total_parameters = 0
+    for variable in tf.trainable_variables():
+        # shape is an array of tf.Dimension
+        shape = variable.get_shape()
+        variable_parameters = 1
+        for dim in shape:
+            variable_parameters *= dim.value
+        total_parameters += variable_parameters
+    print(total_parameters)
+
 if __name__ == '__main__':
     # read the config
     config_path = os.path.join(os.getcwd(), 'data/config/reward_config.yml')
@@ -192,17 +171,24 @@ if __name__ == '__main__':
         print('------------ Config ------------')
         print(yaml.dump(config))
 
-    model_name = datetime.datetime.fromtimestamp(time.time()).strftime('%Y_%m_%d_%H_%M_%S')
-    collision_model_name = "collision_simple_trained"
-    models_base_dir = os.path.join('data', 'reward', 'model')
-    collision_model = CollisionModel(model_name, config, models_base_dir, tensorboard_dir=models_base_dir)
+    model_name = "vae" + datetime.datetime.fromtimestamp(time.time()).strftime('%Y_%m_%d_%H_%M_%S')
 
-    train_data, test_data = get_train_and_test_datasets(config, is_collision_model=True)
     image_cache = get_image_cache(config)
+    batch_size = 1
+    images_data = [image.np_array for image in image_cache.items.values()]
+    images_batch_data = [images_data[i:i+batch_size] for i in range(0, len(images_data), batch_size)]
+
+    train_data_count = int(len(images_batch_data) * 0.8)
+    train_data = images_batch_data[:train_data_count]
+    test_data = images_batch_data[train_data_count:]
+
+    models_base_dir = os.path.join('data', 'reward', 'model')
+    vae_model = VAEModel(model_name, config, models_base_dir, tensorboard_dir=models_base_dir)
+
+
 
     gpu_usage = config['general']['gpu_usage']
     session_config = tf.ConfigProto(gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=gpu_usage))
     with tf.Session(config=session_config) as session:
-        collision_model.train(train_data, test_data, image_cache, session)
-    train_data.stop()
-    test_data.stop()
+        count_weights()
+        vae_model.train(train_data, test_data, session)

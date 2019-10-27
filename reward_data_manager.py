@@ -199,6 +199,7 @@ def get_image_cache(config):
     image_cache = None
     scenario = config['general']['scenario']
     if 'vision' in scenario:
+        print("Loading image cache")
         params_dir = os.path.abspath(os.path.join(os.getcwd(), "scenario_params", scenario))
         image_cache = ImageCache(params_dir)
     return image_cache
@@ -213,7 +214,7 @@ def get_train_and_test_datasets(config, is_collision_model=False):
         oversample_goal = config['reward']['oversample_goal']
     oversample_collision = config['reward']['oversample_collision']
     scenario = config['general']['scenario']
-    base_data_dir = os.path.join('/data', 'supervised_data', scenario + '_by_status')
+    base_data_dir = os.path.join('data', 'supervised_data', scenario + '_by_status')
     train_data_dir = os.path.join(base_data_dir, 'train')
     test_data_dir = os.path.join(base_data_dir, 'test')
     train = Oversampler(train_data_dir, batch_size, oversample_goal, oversample_collision,
@@ -246,7 +247,7 @@ def get_batch_and_labels(batch, image_cache):
         all_goal_joints.append(goal_joints[1:])
         all_status.append(status)
         if image_cache is not None:
-	    workspace_id = workspace_id.split(".")[0]+".pkl"
+            workspace_id = workspace_id.split(".")[0]+".pkl"
             image = image_cache.items[workspace_id].np_array
             all_images.append(image)
     return [all_start_joints, all_actions, all_images, all_next_joints, all_goal_joints], all_status
