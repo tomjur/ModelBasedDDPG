@@ -21,16 +21,17 @@ openrave_rl:
 model:
   potential_points: [2, 0., 0.075, 3, 0., 0.085, 4, -0.02, 0.05, 4, 0.005, 0.05, 5, 0.005, 0.035, 5, -0.02, 0.035]
   consider_goal_pose: True
+  goal_configuration_distance_sensitivity: 1.23
 
 train:
   epochs: 20
   save_every_epochs: 1
   #  batch_size: 10240
-  batch_size: 400  # with vision
+  batch_size: 300  # with vision
   test_every_batches: 1000
   initial_learn_rate: 0.001
   decrease_learn_rate_after: 10000
-  learn_rate_decrease_rate: 0.9
+  learn_rate_decrease_rate: 0.5
   gradient_limit: 5.0
   l2_regularization_coefficient: 0.0001
   cross_entropy_coefficient: 1.0
@@ -40,9 +41,9 @@ train:
 network:
   layers: [300, 300, 300, 200, 100, 100]
   activation: 'elu'
-  use_coordnet: false
-  image_network: 'dqn'
+  use_coordnet: true
+  image_network: 'resnet'
   train_vae: true
   vae_latent_dim: 150
-  resnet_num_of_residual_blocks: 4
+  resnet_num_of_residual_blocks: 6
 
