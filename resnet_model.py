@@ -85,9 +85,6 @@ class ResNetModel:
             conv_layer = coord_conv(55, 111, False, input_layer, filter_shape[-1], filter_shape[0:2], stride, padding='same',
                                     use_bias=True, name='{}_conv1'.format(self.prefix))
         else:
-            # set num of channels to 1
-            filter_shape[2] = 1
-
             filter = self.create_variables(name='conv', shape=filter_shape)
             conv_layer = tf.nn.conv2d(input_layer, filter, strides=[1, stride, stride, 1], padding='SAME')
         bn_layer = self.batch_normalization_layer(conv_layer, out_channel)
@@ -171,7 +168,11 @@ class ResNetModel:
 
         layers = []
         with tf.variable_scope('conv0', reuse=reuse):
-            conv0 = self.conv_bn_relu_layer(input_tensor_batch, [3, 3, 3, 16], 1)
+            if self.config['reward']['use_coordnet']:
+                first_filter_shape = [3, 3, 3, 16]
+            else:
+                first_filter_shape = [3, 3, 1, 16]
+            conv0 = self.conv_bn_relu_layer(input_tensor_batch, first_filter_shape, 1)
             self.activation_summary(conv0)
             layers.append(conv0)
 
