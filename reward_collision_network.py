@@ -13,7 +13,7 @@ class CollisionNetwork:
 
         self.config = config
         self.is_vision_enabled = 'vision' in config['general']['scenario']
-        self.image_network = config['reward']['image_network']
+        self.image_network = config['network']['image_network']
         assert('dqn' == self.image_network or 'resnet' == self.image_network)
 
         self.joints_inputs = tf.placeholder(tf.float32, (None, 4), name='joints_inputs')
@@ -55,8 +55,8 @@ class CollisionNetwork:
 
         # get L2 regularization scale
         l2_scale = 0.0
-        if 'l2_regularization_coefficient' in self.config['reward']:
-            l2_scale = self.config['reward']['l2_regularization_coefficient']
+        if 'l2_regularization_coefficient' in self.config['train']:
+            l2_scale = self.config['train']['l2_regularization_coefficient']
 
         # get the next joints
         clipped_next_joints, unclipped_next_joints = self._next_state_model(joints_inputs, action_inputs)
@@ -67,15 +67,15 @@ class CollisionNetwork:
             if self.image_network == 'dqn':
                 visual_inputs = DqnModel(name_prefix, self.config).predict(images_3d, self._reuse_flag)
             else:
-                num_of_residual_blocks = self.config['reward']['resnet_num_of_residual_blocks']
+                num_of_residual_blocks = self.config['network']['resnet_num_of_residual_blocks']
                 visual_inputs = ResNetModel(name_prefix, self.config).predict(images_3d,
                                                                               num_of_residual_blocks,
                                                                               self._reuse_flag)
             current = tf.concat((current, visual_inputs), axis=1)
 
-        layers = self.config['reward']['layers'] + [2]
+        layers = self.config['network']['layers'] + [2]
         for i, layer_size in enumerate(layers):
-            _activation = get_activation(self.config['reward']['activation']) if i < len(layers) - 1 else None
+            _activation = get_activation(self.config['network']['activation']) if i < len(layers) - 1 else None
             current = tf.layers.dense(
                 current,
                 layer_size,

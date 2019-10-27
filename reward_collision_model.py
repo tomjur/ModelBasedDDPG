@@ -7,7 +7,6 @@ import numpy as np
 import os
 import yaml
 import tensorflow as tf
-from dqn_model import DqnModel
 
 
 class CollisionModel:
@@ -24,9 +23,8 @@ class CollisionModel:
         self.train_summaries = []
         self.test_summaries = []
 
-        self.epochs = config['general']['epochs']
-        self.save_every_epochs = config['general']['save_every_epochs']
-        self.train_vae = config['reward']['train_vae']
+        self.epochs = config['train']['epochs']
+        self.save_every_epochs = config['train']['save_every_epochs']
 
         self.network = CollisionNetwork(config, self.model_dir)
         self.net_output = self.network.status_softmax_logits
@@ -59,7 +57,7 @@ class CollisionModel:
         return session.run([self.prediction], feed)[0]
 
     def init_loss(self):
-        status_loss_scale = self.config['reward']['cross_entropy_coefficient']
+        status_loss_scale = self.config['train']['cross_entropy_coefficient']
         status_loss = status_loss_scale * \
                            tf.losses.sparse_softmax_cross_entropy(labels=self.status_input - 1, logits=self.net_output)
         status_loss_summary = tf.summary.scalar('Status_Loss', status_loss)
@@ -92,9 +90,9 @@ class CollisionModel:
         return [accuracy, recall, precision]
 
     def init_optimizer(self):
-        initial_learn_rate = self.config['reward']['initial_learn_rate']
-        decrease_learn_rate_after = self.config['reward']['decrease_learn_rate_after']
-        learn_rate_decrease_rate = self.config['reward']['learn_rate_decrease_rate']
+        initial_learn_rate = self.config['train']['initial_learn_rate']
+        decrease_learn_rate_after = self.config['train']['decrease_learn_rate_after']
+        learn_rate_decrease_rate = self.config['train']['learn_rate_decrease_rate']
 
         learning_rate = tf.train.exponential_decay(initial_learn_rate,
                                                    self.global_step_var,
@@ -107,7 +105,7 @@ class CollisionModel:
 
         gradients, variables = zip(*optimizer.compute_gradients(self.loss, tf.trainable_variables()))
         initial_gradients_norm = tf.global_norm(gradients)
-        gradient_limit = self.config['reward']['gradient_limit']
+        gradient_limit = self.config['train']['gradient_limit']
         if gradient_limit > 0.0:
             gradients, _ = tf.clip_by_global_norm(gradients, gradient_limit, use_norm=initial_gradients_norm)
         clipped_gradients_norm = tf.global_norm(gradients)
@@ -141,7 +139,7 @@ class CollisionModel:
         session.run(tf.global_variables_initializer())
         session.run(tf.local_variables_initializer())
 
-        test_every_batches = self.config['reward']['test_every_batches']
+        test_every_batches = self.config['train']['test_every_batches']
 
         total_train_batches = 0
         for epoch in range(self.epochs):

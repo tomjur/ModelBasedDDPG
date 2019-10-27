@@ -207,12 +207,12 @@ def get_image_cache(config):
 
 def get_train_and_test_datasets(config, is_collision_model=False):
     number_of_unzippers = config['general']['number_of_unzippers']
-    batch_size = config['model']['batch_size']
+    batch_size = config['train']['batch_size']
     if is_collision_model:
         oversample_goal = 0
     else:
-        oversample_goal = config['reward']['oversample_goal']
-    oversample_collision = config['reward']['oversample_collision']
+        oversample_goal = config['train']['oversample_goal']
+    oversample_collision = config['train']['oversample_collision']
     scenario = config['general']['scenario']
     base_data_dir = os.path.join('data', 'supervised_data', scenario + '_by_status')
     train_data_dir = os.path.join(base_data_dir, 'train')
