@@ -23,9 +23,6 @@ class RewardModel:
         self.train_summaries = []
         self.test_summaries = []
 
-        self.epochs = config['general']['epochs']
-        self.save_every_epochs = config['general']['save_every_epochs']
-
         self.collision_model = trained_collision_model
         self.collision_prob = self.collision_model.collision_prob
 
@@ -50,26 +47,28 @@ class RewardModel:
 
     def create_reward_logic(self, next_joints, goal_joints, collision_prob):
         # close-to-goal sensitivity
-        goal_sensitivity = self.config['openrave_rl']['goal_sensitivity']
+        goal_sensitivity = self.config['model']['goal_configuration_distance_sensitivity']
 
         # margin parameter in which the model transitions from 100% close to goal to 0% close to goal
         alpha = 0.4
 
         # distance to goal
-        delta = tf.norm(next_joints - goal_joints, ord='euclidean')
+        self.delta = tf.norm(next_joints - goal_joints, ord='euclidean', axis=1)
 
         # This expression is 0 if the distance between current and goal is below \epsilon.
-        a = tf.maximum(delta - goal_sensitivity, 0)
+        self.a = tf.maximum(self.delta - goal_sensitivity, 0)
 
         # When delta < epsilon: this is 0
         # When delta > epsilon + alpha: this is \alpha,
         # and in-between it is linear
-        b = tf.minimum(a, alpha)
+        self.b = tf.minimum(self.a, alpha)
 
-        is_close_to_goal = 1 - (b / alpha)
+        self.is_close_to_goal = 1 - (self.b / alpha)
 
-        p_goal = (1 - collision_prob) * is_close_to_goal
-        p_free_space = (1 - collision_prob) * (1 - is_close_to_goal)
+        self.is_close_to_goal = tf.expand_dims(self.is_close_to_goal, -1)
+
+        p_goal = (1 - collision_prob) * self.is_close_to_goal
+        p_free_space = (1 - collision_prob) * (1 - self.is_close_to_goal)
 
         return tf.concat((p_free_space, collision_prob, p_goal), axis=1)
 
@@ -98,7 +97,7 @@ class RewardModel:
             [self.test_board.summaries] + self.test_measures,
             test_feed)[0]
         results = session.run(
-            [self.test_measures, self.prediction, self.status_input - 1],
+            [self.test_measures, self.prediction, self.status_input - 1, self.states_probabilities],
             test_feed)
         print(results)
         self.test_board.writer.add_summary(test_summary)
@@ -130,7 +129,7 @@ if __name__ == '__main__':
         print(yaml.dump(config))
 
     models_base_dir = os.path.join('data', 'reward', 'model')
-    collision_model_name = "collision_simple_trained"
+    collision_model_name = "2019_08_31_09_14_58-collision-resnet-vision"
     collision_model = CollisionModel(collision_model_name, config, models_base_dir, tensorboard_dir=models_base_dir)
 
     model_name = datetime.datetime.fromtimestamp(time.time()).strftime('%Y_%m_%d_%H_%M_%S')
